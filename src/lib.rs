@@ -119,20 +119,21 @@ pub enum Shape<'a> {
 
 /// Transform represents a transformation matrix.
 #[must_use]
-pub struct Transform([f32; 16]);
+pub struct Transform(pub [f32; 16]);
+
+/// A Matrix Transform
+#[macro_export] macro_rules! matrix {
+	[$ ( $ x : expr ), *] => ( $crate::Transform([ $( $x ), *]) );
+	[$ ( $ x : expr , ) *] => ( matrix![ $( $x ), *] );
+}
+
+/// A No-Op Transform - An Identity Matrix.
+#[macro_export] macro_rules! identity {
+	() => ( matrix![1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.] );
+}
 
 impl Transform {
-	/// Create a transform that does nothing. ( An identity matrix ).
-	pub fn new() -> Transform {
-		Transform ([
-			1., 0., 0., 0.,
-			0., 1., 0., 0.,
-			0., 0., 1., 0.,
-			0., 0., 0., 1.,
-		])
-	}
-
-	fn combine(mut self, matrix: [f32; 16]) -> Transform {
+/*	fn combine(mut self, matrix: [f32; 16]) -> Transform {
 		self.0 = [
 			(self.0[0] * matrix[0]) + (self.0[1] * matrix[4]) +
 			(self.0[2] * matrix[8]) + (self.0[3] * matrix[12]),
@@ -171,7 +172,7 @@ impl Transform {
 			(self.0[14] * matrix[11]) + (self.0[15] * matrix[15])
 		];
 		self
-	}
+	}*/
 
 	/// Translate self by x, y and z.
 	pub fn translate(mut self, x:f32, y:f32, z:f32) -> Transform {
@@ -206,19 +207,20 @@ impl Transform {
 		let qz = ((num * num3) * num6) - ((num2 * num4) * num5);
 		let qw = ((num * num3) * num5) + ((num2 * num4) * num6);
 
-		let m1 = [
+		let m1 = matrix![
 			qw, qz, -qy, qx,
 			-qz, qw, qx, qy,
 			qy, -qx, qw, qz,
 			-qx, -qy, -qz, qw,
 		];
-		let m2 = [
+		let m2 = matrix![
 			qw, qz, -qy, -qx,
 			-qz, qw, qx, -qy,
 			qy, -qx, qw, -qz,
 			qx, qy, qz, qw,
 		];
-		self.combine(m1).combine(m2)
+
+		m1 * m2
 	}
 
 	/*
@@ -284,6 +286,50 @@ impl ::std::ops::Mul<(f32, f32, f32)> for Transform {
 // 42 13
 // 43 14
 // 44 15
+
+impl ::std::ops::Mul<Transform> for Transform {
+	type Output = Transform;
+
+	fn mul(self, rhs: Transform) -> Self::Output {
+		matrix![
+			(self.0[0] * rhs.0[0]) + (self.0[1] * rhs.0[4]) +
+			(self.0[2] * rhs.0[8]) + (self.0[3] * rhs.0[12]),
+			(self.0[0] * rhs.0[1]) + (self.0[1] * rhs.0[5]) +
+			(self.0[2] * rhs.0[9]) + (self.0[3] * rhs.0[13]),
+			(self.0[0] * rhs.0[2]) + (self.0[1] * rhs.0[6]) +
+			(self.0[2] * rhs.0[10]) + (self.0[3] * rhs.0[14]),
+			(self.0[0] * rhs.0[3]) + (self.0[1] * rhs.0[7]) +
+			(self.0[2] * rhs.0[11]) + (self.0[3] * rhs.0[15]),
+
+			(self.0[4] * rhs.0[0]) + (self.0[5] * rhs.0[4]) +
+			(self.0[6] * rhs.0[8]) + (self.0[7] * rhs.0[12]),
+			(self.0[4] * rhs.0[1]) + (self.0[5] * rhs.0[5]) +
+			(self.0[6] * rhs.0[9]) + (self.0[7] * rhs.0[13]),
+			(self.0[4] * rhs.0[2]) + (self.0[5] * rhs.0[6]) +
+			(self.0[6] * rhs.0[10]) + (self.0[7] * rhs.0[14]),
+			(self.0[4] * rhs.0[3]) + (self.0[5] * rhs.0[7]) +
+			(self.0[6] * rhs.0[11]) + (self.0[7] * rhs.0[15]),
+
+			(self.0[8] * rhs.0[0]) + (self.0[9] * rhs.0[4]) +
+			(self.0[10] * rhs.0[8]) + (self.0[11] * rhs.0[12]),
+			(self.0[8] * rhs.0[1]) + (self.0[9] * rhs.0[5]) +
+			(self.0[10] * rhs.0[9]) + (self.0[11] * rhs.0[13]),
+			(self.0[8] * rhs.0[2]) + (self.0[9] * rhs.0[6]) +
+			(self.0[10] * rhs.0[10]) + (self.0[11] * rhs.0[14]),
+			(self.0[8] * rhs.0[3]) + (self.0[9] * rhs.0[7]) +
+			(self.0[10] * rhs.0[11]) + (self.0[11] * rhs.0[15]),
+
+			(self.0[12] * rhs.0[0]) + (self.0[13] * rhs.0[4]) +
+			(self.0[14] * rhs.0[8]) + (self.0[15] * rhs.0[12]),
+			(self.0[12] * rhs.0[1]) + (self.0[13] * rhs.0[5]) +
+			(self.0[14] * rhs.0[9]) + (self.0[15] * rhs.0[13]),
+			(self.0[12] * rhs.0[2]) + (self.0[13] * rhs.0[6]) +
+			(self.0[14] * rhs.0[10]) + (self.0[15] * rhs.0[14]),
+			(self.0[12] * rhs.0[3]) + (self.0[13] * rhs.0[7]) +
+			(self.0[14] * rhs.0[11]) + (self.0[15] * rhs.0[15])
+		]
+	}
+}
 
 impl ::std::ops::Mul<Vec<f32>> for Transform {
 	type Output = Vec<f32>;
