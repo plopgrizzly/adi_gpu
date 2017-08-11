@@ -1,0 +1,33 @@
+[package]
+name = "willow"
+version = "0.1.0"
+authors = ["Jeron Aldaron Lau <jeron.lau@plopgrizzly.tech>"]
+description = """
+        The Willow Graphics A.P.I is a Rust library for rendering graphics.
+"""
+keywords = [ "vulkan", "graphics", "rendering" ]
+categories = [
+	"rendering::graphics-api", "hardware-support",
+	"rendering::engine", "rendering", "no-std"
+]
+license = "MIT"
+documentation = "https://docs.rs/willow/"
+homepage = "https://docs.rs/crate/willow/"
+repository = "https://github.com/aldarons-tech/willow"
+readme = "README.md"
+exclude = [ "examples/*", ".gitignore", "TODO" ]
+build = "build.rs"
+
+[dependencies]
+ami = "^0.4"
+window = { path = "../window" }
+
+[build-dependencies.gcc]
+version = "0.3.50"
+
+[dev-dependencies]
+aci_png = "^0.2"
+
+[features]
+checks = []
+validation = []
