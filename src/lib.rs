@@ -104,7 +104,7 @@ pub struct Color(pub f32, pub f32, pub f32, pub f32);
 /// A drawable shape.
 pub enum Shape<'a> {
 	/// A Single-Color Shape `(vertices, color)`
-	Solid(&'a [f32], Color),
+	Solid(Vec<f32>, Color),
 	/// A Textured Shape `(vertices, image, texture coordinates)`
 	Texture(&'a [f32], u32, &'a [f32]),
 	/// A Multi-Color Shape - One color per vertex `(vertices, colors)`
@@ -285,25 +285,27 @@ impl ::std::ops::Mul<(f32, f32, f32)> for Transform {
 // 43 14
 // 44 15
 
-impl ::std::ops::Mul<Vec<[f32;4]>> for Transform {
-	type Output = Vec<[f32;4]>;
+impl ::std::ops::Mul<Vec<f32>> for Transform {
+	type Output = Vec<f32>;
 
-	fn mul(self, rhs: Vec<[f32;4]>) -> Self::Output {
+	fn mul(self, rhs: Vec<f32>) -> Self::Output {
 		let mut model = rhs;
 
-		for i in 0..model.len() {
-			let x = model[i][0];
-			let y = model[i][1];
-			let z = model[i][2];
-			let w = model[i][3];
+		for i in 0..(model.len() / 4) {
+			let i = i * 4;
 
-			model[i][0] = self.0[0] * x + self.0[1] * y
+			let x = model[i + 0];
+			let y = model[i + 1];
+			let z = model[i + 2];
+			let w = model[i + 3];
+
+			model[i + 0] = self.0[0] * x + self.0[1] * y
 				+ self.0[2] * z + self.0[3] * w;
-			model[i][1] = self.0[4] * x + self.0[5] * y
+			model[i + 1] = self.0[4] * x + self.0[5] * y
 				+ self.0[6] * z + self.0[7] * w;
-			model[i][2] = self.0[8] * x + self.0[9] * y
+			model[i + 2] = self.0[8] * x + self.0[9] * y
 				+ self.0[10] * z + self.0[11] * w;
-			model[i][3] = self.0[12] * x + self.0[13] * y
+			model[i + 3] = self.0[12] * x + self.0[13] * y
 				+ self.0[14] * z + self.0[15] * w;
 		}
 

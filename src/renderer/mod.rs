@@ -399,7 +399,7 @@ impl Renderer {
 		self.shapes.clear();
 	}
 
-	pub fn solid(&mut self, vertices: &[f32], color: ::Color) -> usize {
+	pub fn solid(&mut self, vertices: Vec<f32>, color: ::Color) -> usize {
 		let size = vertices.len() as u32;
 		let hastx = false;
 		let mut shape = VwShape {
@@ -409,7 +409,7 @@ impl Renderer {
 		};
 
 		unsafe {
-			vw_vulkan_shape(&mut shape, self.vw, &vertices[0],
+			vw_vulkan_shape(&mut shape, self.vw, vertices.as_ptr(),
 				size);
 		}
 
@@ -420,7 +420,7 @@ impl Renderer {
 			vw_instance_new(&self.vw, self.style_solid, 4)
 		};
 
-		let matrix = [ 1.0, 1.0, 1.0, 1.0 ];// color.0, color.1, color.2, color.3 ];
+		let matrix = [ color.0, color.1, color.2, color.3 ];
 
 		vulkan::copy_memory(self.vw.device,
 			instance.uniform_memory, &matrix);
