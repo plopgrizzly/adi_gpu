@@ -19,7 +19,7 @@ pub fn resize(display: &mut willow::Display) {
 
 	// square
 	display.push(willow::Shape::Solid(
-		identity!().scale(0.1, 0.1, 1.0) * SQUARE_MODEL.to_vec(),
+		translate!(0.5; Z) * SQUARE_MODEL.to_vec(),
 		willow::Color(0.5, 1.0, 0.5, 0.5)));
 	// image
 //	display.push(willow::Shape::Textured(IMAGE_MODEL, image, texcoords));

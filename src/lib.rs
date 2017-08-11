@@ -11,6 +11,70 @@
 extern crate ami;
 extern crate window;
 
+/// Transform represents a transformation matrix.
+#[must_use]
+pub struct Transform(pub [f32; 16]);
+
+/// A Matrix Transform
+#[macro_export] macro_rules! matrix {
+	[$ ( $ x : expr ), *] => ( $crate::Transform([ $( $x ), *]) );
+	[$ ( $ x : expr , ) *] => ( matrix![ $( $x ), *] );
+}
+
+/// A No-Op Transform - An Identity Matrix.
+#[macro_export] macro_rules! identity {
+	() => ( matrix![1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.] );
+}
+
+/// Scale Transformation Matrix
+#[macro_export] macro_rules! scale {
+	($x: expr, $y: expr, $z: expr) =>
+		( matrix![$x,0.,0.,0.,0.,$y,0.,0.,0.,0.,$z,0.,0.,0.,0.,1.] );
+	($x: expr, $y: expr) => ( scale!($x, $y, 1.0) );
+	($s: expr; X) => ( scale!($s, 1.0, 1.0) );
+	($s: expr; Y) => ( scale!(1.0, $s, 1.0) );
+	($s: expr; Z) => ( scale!(1.0, 1.0, $s) );
+	($s: expr; 2D) => ( scale!($s, $s) );
+	($s: expr; 3D) => ( scale!($s, $s, $s) );
+}
+
+/// Translation Matrix
+#[macro_export] macro_rules! translate {
+	($x: expr, $y: expr, $z: expr) =>
+		( matrix![1.,0.,0.,$x,0.,1.,0.,$y,0.,0.,1.,$z,0.,0.,0.,1.] );
+	($x: expr, $y: expr) => ( translate!($x, $y, 0.0) );
+	($s: expr; X) => ( translate!($s, 0.0, 0.0) );
+	($s: expr; Y) => ( translate!(0.0, $s, 0.0) );
+	($s: expr; Z) => ( translate!(0.0, 0.0, $s) );
+}
+
+/// Rotation Matrix
+#[macro_export] macro_rules! rotate {
+	($x: expr, $y: expr, $z: expr) => ({
+		let num9 = $z * ::std::f32::consts::PI;
+		let num6 = num9.sin();
+		let num5 = num9.cos();
+		let num8 = $x * ::std::f32::consts::PI;
+		let num4 = num8.sin();
+		let num3 = num8.cos();
+		let num7 = $y * ::std::f32::consts::PI;
+		let num2 = num7.sin();
+		let num = num7.cos();
+
+		let qx = ((num * num4) * num5) + ((num2 * num3) * num6);
+		let qy = ((num2 * num3) * num5) - ((num * num4) * num6);
+		let qz = ((num * num3) * num6) - ((num2 * num4) * num5);
+		let qw = ((num * num3) * num5) + ((num2 * num4) * num6);
+
+		let nx = -qx;
+		let ny = -qy;
+		let nz = -qz;
+
+		matrix![qw,nz,qy,nx,qz,qw,nx,ny,ny,qx,qw,nz,qx,qy,qz,qw] *
+			matrix![qw,nz,qy,qx,qz,qw,nx,qy,ny,qx,qw,qz,nx,ny,nz,qw]
+	});
+}
+
 mod renderer;
 
 pub mod input {
@@ -39,8 +103,12 @@ impl Display {
 
 	/// Add a `Shape` onto the `Display`.
 	pub fn push(&mut self, shape: Shape) -> usize {
+		let matrix = self.renderer.get_projection();
+
 		match shape {
 			Shape::Solid(vertices, color) => {
+				let vertices = matrix * vertices;
+
 				self.renderer.solid(vertices, color)
 			},
 			Shape::Texture(vertices, image, txcoords) => {
@@ -115,147 +183,6 @@ pub enum Shape<'a> {
 	/// A Tinted Texture Shape
 	/// `(vertices, image, texture coordinates, color)`
 	TintTexture(&'a [f32], u32, &'a [f32], Color),
-}
-
-/// Transform represents a transformation matrix.
-#[must_use]
-pub struct Transform(pub [f32; 16]);
-
-/// A Matrix Transform
-#[macro_export] macro_rules! matrix {
-	[$ ( $ x : expr ), *] => ( $crate::Transform([ $( $x ), *]) );
-	[$ ( $ x : expr , ) *] => ( matrix![ $( $x ), *] );
-}
-
-/// A No-Op Transform - An Identity Matrix.
-#[macro_export] macro_rules! identity {
-	() => ( matrix![1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.] );
-}
-
-impl Transform {
-/*	fn combine(mut self, matrix: [f32; 16]) -> Transform {
-		self.0 = [
-			(self.0[0] * matrix[0]) + (self.0[1] * matrix[4]) +
-			(self.0[2] * matrix[8]) + (self.0[3] * matrix[12]),
-			(self.0[0] * matrix[1]) + (self.0[1] * matrix[5]) +
-			(self.0[2] * matrix[9]) + (self.0[3] * matrix[13]),
-			(self.0[0] * matrix[2]) + (self.0[1] * matrix[6]) +
-			(self.0[2] * matrix[10]) + (self.0[3] * matrix[14]),
-			(self.0[0] * matrix[3]) + (self.0[1] * matrix[7]) +
-			(self.0[2] * matrix[11]) + (self.0[3] * matrix[15]),
-
-			(self.0[4] * matrix[0]) + (self.0[5] * matrix[4]) +
-			(self.0[6] * matrix[8]) + (self.0[7] * matrix[12]),
-			(self.0[4] * matrix[1]) + (self.0[5] * matrix[5]) +
-			(self.0[6] * matrix[9]) + (self.0[7] * matrix[13]),
-			(self.0[4] * matrix[2]) + (self.0[5] * matrix[6]) +
-			(self.0[6] * matrix[10]) + (self.0[7] * matrix[14]),
-			(self.0[4] * matrix[3]) + (self.0[5] * matrix[7]) +
-			(self.0[6] * matrix[11]) + (self.0[7] * matrix[15]),
-
-			(self.0[8] * matrix[0]) + (self.0[9] * matrix[4]) +
-			(self.0[10] * matrix[8]) + (self.0[11] * matrix[12]),
-			(self.0[8] * matrix[1]) + (self.0[9] * matrix[5]) +
-			(self.0[10] * matrix[9]) + (self.0[11] * matrix[13]),
-			(self.0[8] * matrix[2]) + (self.0[9] * matrix[6]) +
-			(self.0[10] * matrix[10]) + (self.0[11] * matrix[14]),
-			(self.0[8] * matrix[3]) + (self.0[9] * matrix[7]) +
-			(self.0[10] * matrix[11]) + (self.0[11] * matrix[15]),
-
-			(self.0[12] * matrix[0]) + (self.0[13] * matrix[4]) +
-			(self.0[14] * matrix[8]) + (self.0[15] * matrix[12]),
-			(self.0[12] * matrix[1]) + (self.0[13] * matrix[5]) +
-			(self.0[14] * matrix[9]) + (self.0[15] * matrix[13]),
-			(self.0[12] * matrix[2]) + (self.0[13] * matrix[6]) +
-			(self.0[14] * matrix[10]) + (self.0[15] * matrix[14]),
-			(self.0[12] * matrix[3]) + (self.0[13] * matrix[7]) +
-			(self.0[14] * matrix[11]) + (self.0[15] * matrix[15])
-		];
-		self
-	}*/
-
-	/// Translate self by x, y and z.
-	pub fn translate(mut self, x:f32, y:f32, z:f32) -> Transform {
-		self.0[12] += x;
-		self.0[13] += y;
-		self.0[14] += z;
-		self
-	}
-
-	/// Scale self by x, y and z.
-	pub fn scale(mut self, x:f32, y:f32, z:f32) -> Transform {
-		self.0[0] *= x;
-		self.0[5] *= y;
-		self.0[15] *= z;
-		self
-	}
-
-	/// Rotate self by yaw, pitch and roll.
-	pub fn rotate(self, yaw:f32, pitch:f32, roll:f32) -> Transform {
-		let num9 = roll * ::std::f32::consts::PI;
-		let num6 = num9.sin();
-		let num5 = num9.cos();
-		let num8 = pitch * ::std::f32::consts::PI;
-		let num4 = num8.sin();
-		let num3 = num8.cos();
-		let num7 = yaw * ::std::f32::consts::PI;
-		let num2 = num7.sin();
-		let num = num7.cos();
-
-		let qx = ((num * num4) * num5) + ((num2 * num3) * num6);
-		let qy = ((num2 * num3) * num5) - ((num * num4) * num6);
-		let qz = ((num * num3) * num6) - ((num2 * num4) * num5);
-		let qw = ((num * num3) * num5) + ((num2 * num4) * num6);
-
-		let m1 = matrix![
-			qw, qz, -qy, qx,
-			-qz, qw, qx, qy,
-			qy, -qx, qw, qz,
-			-qx, -qy, -qz, qw,
-		];
-		let m2 = matrix![
-			qw, qz, -qy, -qx,
-			-qz, qw, qx, -qy,
-			qy, -qx, qw, -qz,
-			qx, qy, qz, qw,
-		];
-
-		m1 * m2
-	}
-
-	/*
-	/// Apply perspective with fov degrees for field of view. Note: The
-	/// return value is TransformApply.
-	pub fn perspective(self, window: &Window, fov: f32) -> TransformApply {
-		let scale = (fov * 0.5 * ::std::f32::PI / 180.).tan().recip();
-		let xscale = scale * window.unit_ratio();
-		let t = self.combine([
-				xscale,	0.,	0.,	0.,
-				0.,	scale,	0.,	0.,
-				0.,	0.,	1.,	1.,
-				0.,	0.,	0., 	1.,
-			]);
-
-		TransformApply(t)
-	}
-
-	/// Apply an orthographic projection ( depth doesn't change x and y
-	/// position ). Note: The return value is TransformApply.
-	pub fn orthographic(self, window: &Window) -> TransformApply {
-		TransformApply(self.scale(window.unit_ratio(), 1.0, 1.0))
-	}
-
-	/// Multiply by a projection that scales width and height by the
-	/// smallest widget size. The widget is put at position pos. Position
-	/// isn't affected by aspect ratio.
-	pub fn auto(self, window: &mut Window, pos: (f32, f32))
-		-> TransformApply
-	{
-		let size = window.unit_size();
-		let t = self.scale(size.0, size.1, 1.0)
-			.translate(pos.0, pos.1, 0.0);
-		TransformApply(t)
-	}*/
 }
 
 impl ::std::ops::Mul<(f32, f32, f32)> for Transform {

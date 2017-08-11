@@ -337,10 +337,23 @@ impl Vw {
 	}
 }
 
+fn projection(ratio: f32, fov: f32) -> ::Transform {
+	let scale = (fov * 0.5 * ::std::f32::consts::PI / 180.).tan().recip();
+	let xscale = scale * ratio;
+
+	matrix![
+		xscale,	0.,	0.,	0.,
+		0.,	scale,	0.,	0.,
+		0.,	0.,	1.,	0.,
+		0.,	0.,	1., 	1.,
+	]
+}
+
 pub struct Renderer {
 	vw: Vw,
 	shapes: Vec<Shape>,
 	style_solid: Style,
+	projection: ::Transform,
 }
 
 impl Renderer {
@@ -361,7 +374,10 @@ impl Renderer {
 				shadev.len() as u32);
 		}
 
-		Renderer { vw, shapes, style_solid: styles[0] }
+		let projection = projection(vw.height as f32 / vw.width as f32,
+			90.0);
+
+		Renderer { vw, shapes, style_solid: styles[0], projection }
 	}
 
 	pub fn update(&mut self) {
@@ -395,8 +411,8 @@ impl Renderer {
 			vw_vulkan_resize(&mut self.vw);
 		}
 
-		println!("CLEAR SHAPES");
 		self.shapes.clear();
+		self.projection = projection(size.1 as f32/size.0 as f32, 90.0);
 	}
 
 	pub fn solid(&mut self, vertices: Vec<f32>, color: ::Color) -> usize {
@@ -429,5 +445,9 @@ impl Renderer {
 		self.shapes.push(Shape { shape, hastx, instance });
 
 		a
+	}
+
+	pub fn get_projection(&self) -> ::Transform {
+		::Transform(self.projection.0)
 	}
 }
