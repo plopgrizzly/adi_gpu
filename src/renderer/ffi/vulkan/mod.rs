@@ -9,19 +9,36 @@
 use window::WindowConnection;
 use ami::*;
 
+mod ffi;
+mod vulkan;
+
 mod create_command_buffer;
 mod create_gpu;
 mod create_gpu_interface;
-mod create_instance;
 mod create_queue;
 mod create_surface;
 mod destroy;
 
+pub struct VulkanRenderer {
+	native: vulkan::Vulkan,
+}
+
+impl ::RenderOps for VulkanRenderer {
+	fn new(app_name: &str, window: ::window::WindowConnection) -> Self {
+		let native = vulkan::Vulkan::new(app_name);
+
+		VulkanRenderer { native }
+	}
+
+	fn update(&self) -> () {
+	}
+}
+
 // VkInstance
-pub struct Instance { pub native: *mut Void }
+pub struct Instance { pub native: vulkan::Vulkan }
 impl Instance {
 	pub fn create(app_name: &str) -> Instance {
-		Instance { native: create_instance::create_instance(app_name) }
+		Instance { native: vulkan::Vulkan::new(app_name) }
 	}
 }
 // TODO: This drop causes crash because Instance goes out of scope when passed
@@ -40,7 +57,7 @@ pub struct Surface { pub native: u64, instance: *mut Void }
 impl Surface {
 	pub fn create(instance: &Instance, nwc: WindowConnection) -> Surface
 	{
-		let instance = instance.native;
+		let instance = instance.native.native();
 
 		Surface {
 			native: create_surface::create_surface(instance, nwc),
@@ -75,7 +92,7 @@ impl Gpu {
 pub struct GpuInterface { pub native: *mut Void }
 impl GpuInterface {
 	pub fn create(instance: &Instance, gpu: &Gpu) -> GpuInterface {
-		let instance = instance.native;
+		let instance = instance.native.native();
 		let present_queue_index = gpu.present_queue_index;
 		let gpu = gpu.native;
 
@@ -146,7 +163,7 @@ enum VkStructureType {
 	CommandPoolCreateInfo = 39,
 	CommandBufferAllocateInfo = 40,
 //	SwapchainCreateInfo = 1000001000,
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(unix)]
 	SurfaceCreateInfo = 1000005000, // XCB
 #[cfg(target_os = "windows")]
 	SurfaceCreateInfo = 1000009000, // Win32

@@ -4,13 +4,13 @@
 // Copyright 2017 (c) Jeron Lau
 // Licensed under the MIT LICENSE
 //
-// src/renderer/ffi/opengl/mod.rs
+// src/renderer/ffi/willow/mod.rs
 
-pub struct OpenGLRenderer { }
+pub struct WillowRenderer { }
 
-impl ::RenderOps for OpenGLRenderer {
+impl ::RenderOps for WillowRenderer {
 	fn new(app_name: &str, window: ::window::WindowConnection) -> Self {
-		OpenGLRenderer { }
+		WillowRenderer { }
 	}
 
 	fn update(&self) -> () {

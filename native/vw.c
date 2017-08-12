@@ -23,20 +23,6 @@ void* vk_get(VkInstance instance, const char* pName) {
 	return (void*)vkGetInstanceProcAddr(instance, pName);
 }
 
-VkResult vk_create_instance(const VkInstanceCreateInfo* pCreateInfo,
-	const VkAllocationCallbacks* pAllocator,
-	VkInstance* pInstance, PFN_vkCreateInstance create_instance)
-{
-//	PFN_vkCreateInstance create_instance = (PFN_vkCreateInstance)vkGetInstanceProcAddr(NULL, pName);
-	return create_instance(pCreateInfo, pAllocator, pInstance);
-}
-
-// VkResult vk_create_surface()
-
-/*PFN_vkCreateInstance vw_get_create_instance(void) {
-	return (PFN_vkCreateInstance)vkGetInstanceProcAddr(NULL, "vkCreateInstance");
-}*/
-
 static inline void vw_vulkan_error(const char *msg, VkResult result) {
 	if(result != VK_SUCCESS) {
 		printf("abort on error %d!", result);

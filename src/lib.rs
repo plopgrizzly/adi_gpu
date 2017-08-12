@@ -76,12 +76,15 @@ pub struct Transform(pub [f32; 16]);
 }
 
 mod renderer;
+mod render_ops;
 
 pub mod input {
 	pub use window::InputQueue as Queue;
 	pub use window::Msg;
 	pub use window::Input;
 }
+
+pub use render_ops::RenderOps;
 
 /// To render anything with The Willow Graphics API, you have to make a
 /// `Display`

@@ -11,6 +11,8 @@ use ami::Void;
 mod ffi;
 
 use self::ffi::vulkan;
+use self::ffi::NativeRenderer;
+use RenderOps;
 
 use window::Window;
 use window::WindowConnection;
@@ -304,7 +306,7 @@ impl Vw {
 		let command_buffer = vulkan::CommandBuffer::create(&gpu_interface,&gpu);
 
 		let mut vw = Vw {
-			instance: instance.native,
+			instance: instance.native.native(),
 			surface: surface.native,
 			present_queue_index: gpu.present_queue_index,
 			present_queue: queue.native,
@@ -360,6 +362,9 @@ impl Renderer {
 	pub fn new(window_name: &str, window_connection: WindowConnection)
 		-> Renderer
 	{
+//		let native = NativeRenderer::new(window_name,
+//			window_connection.clone());
+
 		let mut vw = Vw::new(window_name, window_connection);
 		let shapes = Vec::new();
 		let shadev = vec![
