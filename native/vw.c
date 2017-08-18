@@ -59,13 +59,14 @@ void vw_vulkan_swapchain(vw_t* vulkan) {
 
 	// Surface Resolution
 	VkExtent2D surfaceResolution = surface_capables.currentExtent;
-	if(surfaceResolution.width == -1) {
+/*	if(surfaceResolution.width == (uint32_t)-1) {
+		printf("SURFACEWIDTH=-1\n");
 		surfaceResolution.width = vulkan->width;
 		surfaceResolution.height = vulkan->height;
-	} else {
+	} else {*/
 		vulkan->width = surfaceResolution.width;
 		vulkan->height = surfaceResolution.height;
-	}
+//	}
 	// Choose a present mode.
 	uint32_t presentModeCount = 0;
 	vkGetPhysicalDeviceSurfacePresentModesKHR(vulkan->gpu, vulkan->surface,
@@ -327,23 +328,27 @@ static inline void vw_vulkan_depth_buffer(vw_t* vulkan) {
 static inline void vw_vulkan_render_pass(vw_t* vulkan) {
 	VkAttachmentDescription passAttachments[2] = {
 		// Color Buffer
-		[0].format = vulkan->color_format,
-		[0].samples = VK_SAMPLE_COUNT_1_BIT,
-		[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-		[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-		[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-		[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-		[0].initialLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		[0] = {
+			.format = vulkan->color_format,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.initialLayout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		},
 		// Depth Buffer
-		[1].format = VK_FORMAT_D16_UNORM,
-		[1].samples = VK_SAMPLE_COUNT_1_BIT,
-		[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-		[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-		[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-		[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-		[1].initialLayout =VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-		[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		[1] = {
+			.format = VK_FORMAT_D16_UNORM,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.initialLayout =VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		},
 	};
 	VkAttachmentReference colorAttachmentReference = {
 		.attachment = 0,
@@ -658,9 +663,9 @@ void vw_vulkan_animate(vw_t* vulkan, vw_texture_t* tx, uint32_t w, uint32_t h,
 	vw_vulkan_error("map memory", vkMapMemory(vulkan->device,
 		tx->mappable_memory, 0, tx->size, 0, &data));
 
-	for (int y = 0; y < h; y++) {
+	for (uint32_t y = 0; y < h; y++) {
 		uint8_t *rowPtr = data;
-		for (int x = 0; x < w; x++) {
+		for (uint32_t x = 0; x < w; x++) {
 			memcpy(rowPtr, &p[((y * w) + x) * 4], 4);
 			rowPtr += 4;
 		}
@@ -831,7 +836,7 @@ vw_texture_t vw_vulkan_texture(vw_t* vulkan, uint32_t w, uint32_t h,
 	VkImageViewCreateInfo view_info = {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.pNext = NULL,
-		.image = VK_NULL_HANDLE,
+		.image = texture.image,
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.format = VK_FORMAT_B8G8R8A8_SRGB,
 		.components.r = VK_COMPONENT_SWIZZLE_R,
@@ -843,7 +848,6 @@ vw_texture_t vw_vulkan_texture(vw_t* vulkan, uint32_t w, uint32_t h,
 		.subresourceRange.levelCount = 1,
 		.subresourceRange.baseArrayLayer = 0,
 		.subresourceRange.layerCount = 1,
-		.image = texture.image,
 	};
 	vw_vulkan_error("create image view", vkCreateImageView(vulkan->device,
 		&view_info, NULL, &texture.view));
@@ -1013,7 +1017,7 @@ void vw_vulkan_pipeline(vw_pipeline_t* pipeline, vw_t* vulkan, vw_shader_t* shad
 		.pDynamicStates = dynamicState,
 	};
 
-	for(int i = 0; i < ns; i++) {
+	for(unsigned int i = 0; i < ns; i++) {
 		//
 		const VkDescriptorSetLayoutCreateInfo descriptor_layout = {
 			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -1092,7 +1096,7 @@ void vw_vulkan_resize(vw_t* vulkan) {
 
 void vw_vulkan_swapchain_delete(vw_t* vulkan) {
 	// Free framebuffers & image view #1
-	for (int i = 0; i < vulkan->image_count; i++) {
+	for (unsigned int i = 0; i < vulkan->image_count; i++) {
 		vkDestroyFramebuffer(vulkan->device, vulkan->frame_buffers[i],
 			NULL);
 		vkDestroyImageView(vulkan->device,
