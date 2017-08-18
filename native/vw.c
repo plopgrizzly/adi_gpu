@@ -31,14 +31,8 @@ static inline void vw_vulkan_error(const char *msg, VkResult result) {
 	}
 }
 
-static inline void vw_vulkan_swapchain(vw_t* vulkan) {
+void vw_vulkan_swapchain(vw_t* vulkan) {
 	// Find preferred format:
-	uint32_t formatCount = 1;
-	VkSurfaceFormatKHR surface_format;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(vulkan->gpu, vulkan->surface,
-		&formatCount, &surface_format);
-	vulkan->color_format = surface_format.format == VK_FORMAT_UNDEFINED ?
-		VK_FORMAT_B8G8R8_UNORM : surface_format.format;
 	VkSurfaceCapabilitiesKHR surface_capables;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vulkan->gpu, vulkan->surface,
 		&surface_capables);
@@ -104,7 +98,7 @@ static inline void vw_vulkan_swapchain(vw_t* vulkan) {
 		.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
 		.presentMode = present_mode,
 		.clipped = 1,
-		.oldSwapchain = 0, // NULL TODO: ?
+		.oldSwapchain = vulkan->swapchain,
 	};
 	vw_vulkan_error("Failed to create swapchain.", vkCreateSwapchainKHR(
 		vulkan->device, &swapChainCreateInfo, NULL, &vulkan->swapchain));
@@ -1090,7 +1084,6 @@ void vw_vulkan_pipeline(vw_pipeline_t* pipeline, vw_t* vulkan, vw_shader_t* shad
 }
 
 void vw_vulkan_resize(vw_t* vulkan) {
-	vw_vulkan_swapchain(vulkan); // Link Swapchain to Vulkan Instance
 	vw_vulkan_image_view(vulkan); // Link Image Views for each framebuffer
 	vw_vulkan_depth_buffer(vulkan); // Link Depth Buffer to swapchain
 	vw_vulkan_render_pass(vulkan); // Link Render Pass to swapchain

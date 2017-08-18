@@ -1,10 +1,13 @@
-/*
- * adi_screen - Aldaron's Device Interface - Screen - "glsl/color.vert"
- * Copyright 2017 (c) Jeron Lau - Licensed under the MIT LICENSE
-*/
+// Willow Graphics API
+//
+// Copyright 2017 (c) Aldaron's Tech
+// Copyright 2017 (c) Jeron Lau
+// Licensed under the MIT LICENSE
+//
+// src/native_renderer/vulkan/glsl/gradient.vert
 
 #version 450
-#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_separate_shader_objects : enable // TODO: is needed?
 
 layout (binding = 0) uniform UniformBuffer {
 	mat4 mtf;

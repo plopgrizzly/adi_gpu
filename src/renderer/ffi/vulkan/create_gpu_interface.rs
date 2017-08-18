@@ -64,7 +64,7 @@ fn layer_names(_: &()) -> [*const i8; NUM_LAYERS as usize] {
 	[ ]
 }
 
-pub fn create_gpu_interface(instance: *mut Void, gpu: usize,
+pub fn create_gpu_interface(instance: *mut Void, gpu: *mut Void,
 	present_queue_index: u32) -> *mut Void
 {
 	let mut device = NULL.as_mut_ptr();
@@ -95,7 +95,7 @@ pub fn create_gpu_interface(instance: *mut Void, gpu: usize,
 			fn vkGetInstanceProcAddr(instance: *mut Void,
 				name: *const i8)
 			-> extern "system" fn(
-				physicalDevice: usize,
+				physicalDevice: *mut Void,
 				pCreateInfo: *const VkDeviceCreateInfo,
 				pAllocator: *mut Void,
 				pDevice: *mut *mut Void) -> VkResult;

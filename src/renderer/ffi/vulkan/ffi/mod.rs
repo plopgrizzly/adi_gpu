@@ -4,7 +4,11 @@
 // Copyright 2017 (c) Jeron Lau
 // Licensed under the MIT LICENSE
 //
-// src/renderer/ffi/vulkan/ffi.rs
+// src/renderer/ffi/vulkan/ffi/mod.rs
+
+pub mod types;
+
+use self::types::*;
 
 use ami::{ Void, NULL };
 use std::mem;
@@ -145,7 +149,7 @@ unsafe fn vk_sym<T>(connection: Connection, name: &[u8]) -> T {
 	mem::transmute_copy::<*mut Void, T>(&function_ptr)
 }
 
-pub unsafe fn create_instance(dl: *mut Void, name: &str) -> *mut Void {
+pub unsafe fn create_instance(dl: *mut Void, name: &str) -> VkInstance {
 	#[repr(C)]
 	struct VkApplicationInfo {
 		s_type: VkStructureType,
@@ -199,7 +203,7 @@ pub unsafe fn create_instance(dl: *mut Void, name: &str) -> *mut Void {
 	let vk_create_instance: unsafe extern "system" fn(
 		pCreateInfo: *const VkInstanceCreateInfo,
 		pAllocator: *mut Void,
-		pInstance: *mut *mut Void) -> VkResult
+		pInstance: *mut VkInstance) -> VkResult
 		= dl_sym(dl, b"vkCreateInstance\0");
 
 	vk_create_instance(
@@ -248,4 +252,34 @@ pub unsafe fn create_instance(dl: *mut Void, name: &str) -> *mut Void {
 	);
 
 	instance
+}
+
+pub unsafe fn get_color_format(connection: &Connection, gpu: VkPhysicalDevice,
+	surface: VkSurfaceKHR) -> VkFormat
+{
+	// Load Function
+	type VkGetPhysicalDeviceSurfaceFormatsKHR =
+		unsafe extern "system" fn(VkPhysicalDevice, VkSurfaceKHR,
+			*mut u32, *mut VkSurfaceFormatKHR) -> VkResult;
+	let function_name = b"vkGetPhysicalDeviceSurfaceFormatsKHR\0";
+	let get_gpu_surface_formats: VkGetPhysicalDeviceSurfaceFormatsKHR
+		= dl_sym(connection.1.dl_handle, function_name);
+
+	// Set Data
+	let mut nformats = 1;
+	let mut format = mem::uninitialized();
+
+	// Run Function
+	get_gpu_surface_formats(gpu, surface, &mut nformats, &mut format);
+
+	// Process data
+	if format.format == VkFormat::UNDEFINED {
+		VkFormat::B8G8R8_UNORM
+	} else {
+		format.format
+	}
+}
+
+pub unsafe fn create_swapchain(connection: &Connection) {
+	
 }

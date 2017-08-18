@@ -9,8 +9,8 @@
 use window::WindowConnection;
 use ami::*;
 
-mod ffi;
-mod vulkan;
+pub mod ffi;
+pub mod vulkan;
 
 mod create_command_buffer;
 mod create_gpu;
@@ -18,6 +18,8 @@ mod create_gpu_interface;
 mod create_queue;
 mod create_surface;
 mod destroy;
+
+use self::ffi::types::*;
 
 pub struct VulkanRenderer {
 	native: vulkan::Vulkan,
@@ -55,10 +57,8 @@ impl Instance {
 //#[allow(dead_code)]
 pub struct Surface { pub native: u64, instance: *mut Void }
 impl Surface {
-	pub fn create(instance: &Instance, nwc: WindowConnection) -> Surface
+	pub fn create(instance: VkInstance, nwc: WindowConnection) -> Surface
 	{
-		let instance = instance.native.native();
-
 		Surface {
 			native: create_surface::create_surface(instance, nwc),
 			instance: instance,
@@ -77,7 +77,7 @@ impl Surface {
 } */
 
 // VkPhysicalDevice
-pub struct Gpu { pub native: usize, pub present_queue_index: u32 }
+pub struct Gpu { pub native: *mut Void, pub present_queue_index: u32 }
 impl Gpu {
 	pub fn create(surface: &Surface) -> Gpu {
 		let instance = surface.instance;
@@ -91,8 +91,7 @@ impl Gpu {
 // VkDevice
 pub struct GpuInterface { pub native: *mut Void }
 impl GpuInterface {
-	pub fn create(instance: &Instance, gpu: &Gpu) -> GpuInterface {
-		let instance = instance.native.native();
+	pub fn create(instance: VkInstance, gpu: &Gpu) -> GpuInterface {
 		let present_queue_index = gpu.present_queue_index;
 		let gpu = gpu.native;
 
