@@ -41,138 +41,57 @@ extern "C" {
 	fn dlsym(handle: *mut Void, symbol: *const i8) -> *mut Void;
 }
 
-#[repr(C)]
-enum VkStructureType {
-	ApplicationInfo = 0,
-	InstanceCreateInfo = 1,
-	DeviceQueueCreateInfo = 2,
-	DeviceCreateInfo = 3,
-//	MemoryAllocateInfo = 5,
-//	BufferCreateInfo = 12,
-//	ImageCreateInfo = 14,
-//	ImageViewCreateInfo = 15,
-//	PipelineCacheCreateInfo = 17,
-//	PipelineLayoutCreateInfo = 30,
-//	SamplerCreateInfo = 31,
-//	DescriptorSetLayoutCreateInfo = 32,
-//	RenderPassCreateInfo = 38,
-	CommandPoolCreateInfo = 39,
-	CommandBufferAllocateInfo = 40,
-//	SwapchainCreateInfo = 1000001000,
-#[cfg(unix)]
-	SurfaceCreateInfo = 1000005000, // XCB
-#[cfg(target_os = "windows")]
-	SurfaceCreateInfo = 1000009000, // Win32
-#[cfg(target_os = "android")]
-	SurfaceCreateInfo = 1000008000, // Android
+pub struct Connection {
+	pub vk: VkInstance,
+	pub lib: *mut Void,
+	vksym: unsafe extern "system" fn(VkInstance, *const i8) -> *mut Void,
+	mapmem: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
+		VkDeviceSize, VkDeviceSize, VkFlags, *mut *mut f32)
+		-> VkResult,
+	draw: unsafe extern "system" fn(VkCommandBuffer, u32, u32, u32, u32)
+		-> (),
+	unmap: unsafe extern "system" fn(VkDevice, VkDeviceMemory) -> (),
 }
 
-#[repr(C)]
-#[allow(dead_code)] // Never used because value set by vulkan.
-enum VkResult {
-	Success = 0,
-	NotReady = 1,
-	Timeout = 2,
-	EventSet = 3,
-	EventReset = 4,
-	Incomplete = 5,
-	OutOfHostMemory = -1,
-	OutOfDeviceMemory = -2,
-	InitFailed = -3,
-	DeviceLost = -4,
-	MemoryMapFailed = -5,
-	LayerNotPresent = -6,
-	ExtNotPresent = -7,
-	FeatureNotPresent = -8,
-	IncompatDriver = -9,
-	TooManyObjects = -10,
-	BadFormat = -11,
-	FragmentedPool = -12,
-	Other = -1024,
-}
-
-impl fmt::Display for VkResult {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match *self {
-
-		VkResult::Success => write!(f, "Success"),
-		VkResult::NotReady => write!(f, "Not Ready"),
-		VkResult::Timeout => write!(f, "Timeout"),
-		VkResult::EventSet => write!(f, "Event Set"),
-		VkResult::EventReset => write!(f, "Event Reset"),
-		VkResult::Incomplete => write!(f, "Incomplete"),
-		VkResult::OutOfHostMemory => write!(f, "Out Of Host Memory"),
-		VkResult::OutOfDeviceMemory => write!(f, "Out Of GPU Memory"),
-		VkResult::InitFailed => write!(f, "Init Failed"),
-		VkResult::DeviceLost => write!(f, "Device Lost"),
-		VkResult::MemoryMapFailed => write!(f, "Memory Map Failed"),
-		VkResult::LayerNotPresent => write!(f, "Layer Not Present"),
-		VkResult::ExtNotPresent => write!(f, "Extension Not Present"),
-		VkResult::FeatureNotPresent => write!(f, "Feature Not Present"),
-		VkResult::IncompatDriver => write!(f, "Incompatible Driver"),
-		VkResult::TooManyObjects => write!(f, "Too Many Objects"),
-		VkResult::BadFormat => write!(f, "Format Not Supported"),
-		VkResult::FragmentedPool => write!(f, "Fragmented Pool"),
-		_ => write!(f, "Unknown Error"),
-
-		}
-	}
-}
-
-pub struct Dl {
-	pub dl_handle: *mut Void,
-	vk_sym: unsafe extern "system" fn(instance: *mut Void, name: *const i8)
-		-> *mut Void,
-}
-
-pub type Connection = (*mut Void, Dl);
-
-pub unsafe fn load_dl() -> Dl {
+pub unsafe fn load(app_name: &str) -> Connection {
 	let vulkan = b"libvulkan.so.1\0";
 
-	let dl_handle = dlopen(&vulkan[0] as *const _ as *const i8, 1);
+	let lib = dlopen(&vulkan[0] as *const _ as *const i8, 1);
+	let vksym = dl_sym(lib, b"vkGetInstanceProcAddr\0");
+	let vk = create_instance(
+		vk_sym(mem::zeroed(), vksym, b"vkCreateInstance\0"), app_name
+	);
 
-	Dl {
-		dl_handle: dl_handle,
-		vk_sym: dl_sym(dl_handle, b"vkGetInstanceProcAddr\0"),
+	Connection {
+		vk, lib, vksym,
+		mapmem: vk_sym(vk, vksym, b"vkMapMemory\0"),
+		draw: vk_sym(vk, vksym, b"vkCmdDraw\0"),
+		unmap: vk_sym(vk, vksym, b"vkUnmapMemory\0"),
 	}
 }
 
 unsafe fn dl_sym<T>(lib: *mut Void, name: &[u8]) -> T {
-	let function_ptr = dlsym(lib, &name[0] as *const _ as *const i8);
-	mem::transmute_copy::<*mut Void, T>(&function_ptr)
+	let fnPtr = dlsym(lib, &name[0] as *const _ as *const i8);
+
+	mem::transmute_copy::<*mut Void, T>(&fnPtr)
 }
 
-unsafe fn vk_sym<T>(connection: Connection, name: &[u8]) -> T {
-	let function_ptr = (connection.1.vk_sym)(connection.0,
-		&name[0] as *const _ as *const i8);
-	mem::transmute_copy::<*mut Void, T>(&function_ptr)
+unsafe fn vk_sym<T>(vk: VkInstance, vksym: unsafe extern "system" fn(
+	VkInstance, *const i8) -> *mut Void, name: &[u8]) -> T
+{
+	let fnPtr = vksym(vk, &name[0] as *const _ as *const i8);
+
+	mem::transmute_copy::<*mut Void, T>(&fnPtr)
 }
 
-pub unsafe fn create_instance(dl: *mut Void, name: &str) -> VkInstance {
-	#[repr(C)]
-	struct VkApplicationInfo {
-		s_type: VkStructureType,
-		p_next: *mut Void,
-		p_application_name: *const i8,
-		application_version: u32,
-		p_engine_name: *const i8,
-		engine_version: u32,
-		api_version: u32,
-	}
+unsafe fn sym<T>(connection: &Connection, name: &[u8]) -> T {
+	vk_sym(connection.vk, connection.vksym, name)
+}
 
-	#[repr(C)]
-	struct VkInstanceCreateInfo {
-		s_type: VkStructureType,
-		p_next: *mut Void,
-		flags: u32,
-		p_application_info: *const VkApplicationInfo,
-		enabled_layer_count: u32,
-		pp_enabled_layer_names: *const *const i8,
-		enabled_extension_count: u32,
-		pp_enabled_extension_names: *const *const i8,
-	}
-
+unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
+	*const VkInstanceCreateInfo, *mut Void, *mut VkInstance) -> VkResult,
+	name: &str) -> VkInstance
+{
 	let engine = concat!(
 		env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION")
 	);
@@ -198,13 +117,6 @@ pub unsafe fn create_instance(dl: *mut Void, name: &str) -> VkInstance {
 	let s3 = CString::new("VK_EXT_debug_report").unwrap();
 
 	let mut instance = mem::uninitialized();
-
-	// Get & Run vkCreateInstance
-	let vk_create_instance: unsafe extern "system" fn(
-		pCreateInfo: *const VkInstanceCreateInfo,
-		pAllocator: *mut Void,
-		pInstance: *mut VkInstance) -> VkResult
-		= dl_sym(dl, b"vkCreateInstance\0");
 
 	vk_create_instance(
 		&VkInstanceCreateInfo {
@@ -254,6 +166,190 @@ pub unsafe fn create_instance(dl: *mut Void, name: &str) -> VkInstance {
 	instance
 }
 
+pub unsafe fn get_gpu(connection: &Connection, instance: VkInstance,
+	surface: VkSurfaceKHR) -> (VkPhysicalDevice, u32)
+{
+	#[repr(C)]
+	#[derive(Copy, Clone)]
+	struct VkExtent3D {
+		width: u32,
+		height: u32,
+		depth: u32,
+	}
+
+	#[repr(C)]
+	#[derive(Copy, Clone)]
+	struct VkQueueFamilyProperties {
+		queue_flags: u32,
+		queue_count: u32,
+		timestamp_valid_bits: u32,
+		min_image_transfer_granularity: VkExtent3D,
+	}
+
+	// Load Function
+	type ListGpus = unsafe extern "system" fn(VkInstance, *mut u32,
+		*mut VkPhysicalDevice) -> VkResult;
+	let listGPUs: ListGpus = sym(connection,
+		b"vkEnumeratePhysicalDevices\0");
+
+	// Set Data
+	let mut num_gpus = 0;
+
+	// Run Function
+	listGPUs(instance, &mut num_gpus, ptr::null_mut());
+
+	// Set Data
+	let mut gpus = vec![mem::uninitialized(); num_gpus as usize];
+
+	// Run function
+	listGPUs(instance, &mut num_gpus, gpus.as_mut_ptr());
+
+	// Load functions
+	type GetGpuQueueFamProps = unsafe extern "system" fn(VkPhysicalDevice,
+		*mut u32, *mut VkQueueFamilyProperties) -> ();
+	type GetGpuSurfaceSupport = unsafe extern "system" fn(VkPhysicalDevice,
+		u32, VkSurfaceKHR, *mut u32) -> VkResult;
+
+	let getProps: GetGpuQueueFamProps = sym(connection,
+		b"vkGetPhysicalDeviceQueueFamilyProperties\0");
+	let getSupport: GetGpuSurfaceSupport = sym(connection,
+		b"vkGetPhysicalDeviceSurfaceSupportKHR\0");
+
+	// Process Data
+	for i in 0..(num_gpus as usize) {
+		let mut num_queue_families = 0;
+
+		getProps(gpus[i], &mut num_queue_families, ptr::null_mut());
+
+		let mut properties = vec![VkQueueFamilyProperties {
+			queue_flags: 0,
+			queue_count: 0,
+			timestamp_valid_bits: 0,
+			min_image_transfer_granularity: VkExtent3D {
+				width: 0, height: 0, depth: 0,
+			},
+		}; num_queue_families as usize];
+
+		getProps(gpus[i], &mut num_queue_families,
+			properties.as_mut_ptr());
+
+		for j in 0..(num_queue_families as usize) {
+			let k = j as u32;
+			let mut supports_present = 0;
+
+			getSupport(gpus[i], k, surface, &mut supports_present);
+
+			if supports_present != 0 &&
+				(properties[j].queue_flags & 0x00000001) != 0
+			{
+				return (gpus[i], k);
+			}
+		}
+	}
+
+	panic!("Couldn't Create Gpu.");
+}
+
+pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
+	pqi: u32) -> VkDevice
+{
+	#[repr(C)]
+	struct VkDeviceQueueCreateInfo {
+		s_type: VkStructureType,
+		p_next: *mut Void,
+		flags: u32,
+		queue_family_index: u32,
+		queue_count: u32,
+		p_queue_priorities: *const f32,
+	}
+
+	#[repr(C)]
+	struct VkDeviceCreateInfo {
+		s_type: VkStructureType,
+		p_next: *mut Void,
+		flags: u32,
+		queue_create_info_count: u32,
+		p_queue_create_infos: *const VkDeviceQueueCreateInfo,
+		enabled_layer_count: u32,
+		enabled_layer_names: *const *const i8,
+		enabled_extension_count: u32,
+		enabled_extension_names: *const *const i8,
+		enabled_features: *mut Void,
+	}
+
+	// Load function
+	type VkCreateDevice = extern "system" fn(
+		physicalDevice: VkPhysicalDevice,
+		pCreateInfo: *const VkDeviceCreateInfo,
+		pAllocator: *mut Void,
+		pDevice: *mut VkDevice) -> VkResult;
+	let vk_create_device: VkCreateDevice = sym(connection,
+		b"vkCreateDevice\0");
+
+	// Set Data
+	let validation = CString::new("VK_LAYER_LUNARG_standard_validation")
+		.unwrap();
+
+	let mut device = mem::uninitialized();
+	let ext = CString::new("VK_KHR_swapchain").unwrap();
+	let create_info = VkDeviceCreateInfo {
+		s_type: VkStructureType::DeviceCreateInfo,
+		p_next: NULL.as_mut_ptr(),
+		flags: 0,
+		queue_create_info_count: 1,
+		p_queue_create_infos: &VkDeviceQueueCreateInfo {
+			s_type: VkStructureType::DeviceQueueCreateInfo,
+			p_next: NULL.as_mut_ptr(),
+			flags: 0,
+			queue_family_index: pqi,
+			queue_count: 1,
+			p_queue_priorities: &1.0,
+		},
+		enabled_layer_count: {
+			if cfg!(feature = "checks") { 1 } else { 0 }
+		},
+		enabled_layer_names: {
+			if cfg!(feature = "checks") {
+				&validation.as_ptr()
+			} else {
+				ptr::null()
+			}
+		},
+		enabled_extension_count: 1,
+		enabled_extension_names: &ext.as_ptr(),
+		enabled_features: NULL.as_mut_ptr(),
+	};
+
+	vk_create_device(gpu, &create_info, NULL.as_mut_ptr(), &mut device);
+
+	device
+}
+
+pub unsafe fn map_memory(connection: &Connection, device: VkDevice,
+	vb_memory: VkDeviceMemory, size: u64) -> *mut f32
+{
+	let mut mapped = ptr::null_mut();
+
+	/*vw_vulkan_error("Failed to test map buffer memory.", */
+	(connection.mapmem)(device, vb_memory, 0, size, 0, &mut mapped);
+	/*);*/
+	mapped
+}
+
+pub unsafe fn unmap_memory(connection: &Connection, device: VkDevice,
+	vb_memory: VkDeviceMemory) -> ()
+{
+	(connection.unmap)(device, vb_memory);
+}
+
+pub unsafe fn cmd_draw(connection: &Connection, cmdBuf: VkCommandBuffer,
+	nvertices: u32, ninstances: u32, firstvertex: u32, firstinstance: u32)
+	-> ()
+{
+	(connection.draw)(cmdBuf, nvertices, ninstances, firstvertex,
+		firstinstance);
+}
+
 pub unsafe fn get_color_format(connection: &Connection, gpu: VkPhysicalDevice,
 	surface: VkSurfaceKHR) -> VkFormat
 {
@@ -263,7 +359,7 @@ pub unsafe fn get_color_format(connection: &Connection, gpu: VkPhysicalDevice,
 			*mut u32, *mut VkSurfaceFormatKHR) -> VkResult;
 	let function_name = b"vkGetPhysicalDeviceSurfaceFormatsKHR\0";
 	let get_gpu_surface_formats: VkGetPhysicalDeviceSurfaceFormatsKHR
-		= dl_sym(connection.1.dl_handle, function_name);
+		= sym(connection, function_name);
 
 	// Set Data
 	let mut nformats = 1;
@@ -282,4 +378,29 @@ pub unsafe fn get_color_format(connection: &Connection, gpu: VkPhysicalDevice,
 
 pub unsafe fn create_swapchain(connection: &Connection) {
 	
+}
+
+pub unsafe fn destroy_instance(connection: &Connection) -> () {
+	// Load Function
+	type VkDestroyInstance = unsafe extern "system" fn(instance: VkInstance,
+		pAllocator: *mut Void) -> ();
+	let function_name = b"vkDestroyInstance\0";
+	let destroy: VkDestroyInstance =
+		sym(connection, function_name);
+
+	// Run Function
+	destroy(connection.vk, NULL.as_mut_ptr());
+}
+
+pub unsafe fn destroy_surface(connection: &Connection, surface: VkSurfaceKHR)
+	-> ()
+{
+	// Load Function
+	type VkDestroySurface = unsafe extern "system" fn(instance: VkInstance,
+		surface: VkSurfaceKHR, pAllocator: *mut Void) -> ();
+	let destroy: VkDestroySurface = sym(connection,
+		b"vkDestroySurfaceKHR\0");
+
+	// Run Function
+	destroy(connection.vk, surface, NULL.as_mut_ptr());
 }

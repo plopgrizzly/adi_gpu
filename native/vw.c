@@ -9,20 +9,6 @@
 
 #include "vw.h"
 
-/*#if defined(VK_USE_PLATFORM_ANDROID_KHR)
-
-void android_main(struct android_app *app) {
-	wrapper_main();
-}
-
-#endif*/
-
-// 
-
-void* vk_get(VkInstance instance, const char* pName) {
-	return (void*)vkGetInstanceProcAddr(instance, pName);
-}
-
 static inline void vw_vulkan_error(const char *msg, VkResult result) {
 	if(result != VK_SUCCESS) {
 		printf("abort on error %d!", result);
@@ -602,7 +588,7 @@ vw_instance_t vw_vulkan_uniforms(const vw_t* vulkan, vw_pipeline_t pipeline,
 	return instance;
 }
 
-void vw_vulkan_shape(vw_shape_t* shape, vw_t vulkan, const float* v,
+void vw_vulkan_shape(vw_shape_t* shape, const vw_t* vulkan, const float* v,
 	uint32_t size)
 {
 	// Create our vertex buffer:
@@ -617,37 +603,38 @@ void vw_vulkan_shape(vw_shape_t* shape, vw_t vulkan, const float* v,
 		.pQueueFamilyIndices = NULL,
 	};
 	vw_vulkan_error("Failed to create vertex input buffer.", vkCreateBuffer(
-		vulkan.device, &vertex_buffer_ci, NULL,
+		vulkan->device, &vertex_buffer_ci, NULL,
 		&shape->vertex_input_buffer));
 
 	// Allocate memory for vertex buffer.
 	VkMemoryRequirements vertexBufferMemoryRequirements;
-	vkGetBufferMemoryRequirements(vulkan.device, shape->vertex_input_buffer,
+	vkGetBufferMemoryRequirements(vulkan->device, shape->vertex_input_buffer,
 		&vertexBufferMemoryRequirements);
 	VkMemoryAllocateInfo bufferAllocateInfo = {
 		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.pNext = NULL,
 		.allocationSize = vertexBufferMemoryRequirements.size,
-		.memoryTypeIndex = memory_type_from_properties(&vulkan,
+		.memoryTypeIndex = memory_type_from_properties(vulkan,
 			vertexBufferMemoryRequirements.memoryTypeBits,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
 	};
 	vw_vulkan_error("Failed to allocate buffer memory.", vkAllocateMemory(
-		vulkan.device, &bufferAllocateInfo, NULL,
+		vulkan->device, &bufferAllocateInfo, NULL,
 		&shape->vertex_buffer_memory));
 	// Copy buffer data.
 	void *mapped;
 //	printf("%d %d %d %d %d\n", sizeof(VkDevice), sizeof(VkDeviceMemory), sizeof(VkDeviceSize), sizeof(VkMemoryMapFlags), sizeof(void**));
 	vw_vulkan_error("Failed to map buffer memory.", vkMapMemory(
-		vulkan.device, shape->vertex_buffer_memory, 0, VK_WHOLE_SIZE, 0,
+		vulkan->device, shape->vertex_buffer_memory, 0, VK_WHOLE_SIZE, 0,
 		&mapped));
 	memcpy(mapped, v, sizeof(float) * size);
-	vkUnmapMemory(vulkan.device, shape->vertex_buffer_memory);
+	vkUnmapMemory(vulkan->device, shape->vertex_buffer_memory);
 	vw_vulkan_error("Failed to bind buffer memory.", vkBindBufferMemory(
-		vulkan.device, shape->vertex_input_buffer,
+		vulkan->device, shape->vertex_input_buffer,
 		shape->vertex_buffer_memory, 0));
 }
 
+// TODO: Remove after Windows port works.
 float* test_map(VkDevice device, VkDeviceMemory vertex_buffer_memory, uint64_t wholesize) {
 	void* mapped = NULL;
 	vw_vulkan_error("Failed to test map buffer memory.", vkMapMemory(
@@ -854,7 +841,7 @@ vw_texture_t vw_vulkan_texture(vw_t* vulkan, uint32_t w, uint32_t h,
 	return texture;
 }
 
-void vw_vulkan_shader(vw_shader_t* shader, vw_t vulkan,
+void vw_vulkan_shader(vw_shader_t* shader, const vw_t* vulkan,
 	void* vdata, uint32_t vsize, void* fdata, uint32_t fsize)
 {
 	// Vertex Shader
@@ -864,7 +851,7 @@ void vw_vulkan_shader(vw_shader_t* shader, vw_t vulkan,
 		.pCode = (void *)vdata,
 	};
 	vw_vulkan_error("Failed to create vertex shader.", vkCreateShaderModule(
-		vulkan.device,&vertexShaderCreationInfo,NULL,&shader->vertex));
+		vulkan->device,&vertexShaderCreationInfo,NULL,&shader->vertex));
 	// Fragment Shader
 	VkShaderModuleCreateInfo fragmentShaderCreationInfo = {
 		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -872,7 +859,7 @@ void vw_vulkan_shader(vw_shader_t* shader, vw_t vulkan,
 		.pCode = (void *)fdata,
 	};
 	vw_vulkan_error("Failed to create vertex shader.", vkCreateShaderModule(
-		vulkan.device,&fragmentShaderCreationInfo,NULL,&shader->fragment));
+		vulkan->device,&fragmentShaderCreationInfo,NULL,&shader->fragment));
 }
 
 void vw_vulkan_pipeline(vw_pipeline_t* pipeline, vw_t* vulkan, vw_shader_t* shaders,
@@ -1209,10 +1196,6 @@ void vw_vulkan_draw_begin(vw_t* vulkan, float r, float g, float b) {
 		.offset = { 0, 0 }, .extent = { vulkan->width, vulkan->height },
 	};
 	vkCmdSetScissor(vulkan->command_buffer, 0, 1, &scissor);
-}
-
-void vw_cmd_draw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
-	vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
 void vw_vulkan_draw_shape(vw_t* vulkan, vw_shape_t* shape,

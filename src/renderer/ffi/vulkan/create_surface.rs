@@ -6,9 +6,15 @@
 //
 // src/renderer/ffi/vulkan/create_surface.rs
 
-use window::WindowConnection;
+// TODO: Make surface a buffer and blit onto screen with window manager.
+
+use std::mem;
+
 use ami::*;
-use super::{ VkResult, VkStructureType, check_error };
+use window::WindowConnection;
+
+use super::ffi::types::*;
+use super::check_error;
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 #[repr(C)]
@@ -43,10 +49,10 @@ struct SurfaceCreateInfo {
 const ERROR : &'static str = "Failed to create surface.";
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-pub fn create_surface_xcb(instance: *mut Void, connection: *mut Void,
-	window: u32) -> u64
+pub fn create_surface_xcb(instance: VkInstance, connection: *mut Void,
+	window: u32) -> VkSurfaceKHR
 {
-	let mut surface = 0;
+	let mut surface = unsafe { mem::uninitialized() };
 	let surface_create_info = SurfaceCreateInfo {
 		s_type: VkStructureType::SurfaceCreateInfo,
 		p_next: NULL.as_mut_ptr(),
@@ -58,10 +64,10 @@ pub fn create_surface_xcb(instance: *mut Void, connection: *mut Void,
 	unsafe {
 		extern "system" {
 			fn vkCreateXcbSurfaceKHR(
-				instance: *mut Void,
+				instance: VkInstance,
 				pCreateInfo: *const SurfaceCreateInfo,
 				pAllocator: *mut Void,
-				surface: *mut u64) -> VkResult;
+				surface: *mut VkSurfaceKHR) -> VkResult;
 		}
 		check_error(ERROR, vkCreateXcbSurfaceKHR(instance,
 			&surface_create_info, NULL.as_mut_ptr(), &mut surface));
@@ -71,8 +77,10 @@ pub fn create_surface_xcb(instance: *mut Void, connection: *mut Void,
 }
 
 #[cfg(target_os = "windows")]
-pub fn create_surface(instance: *mut Void, native_window: &::AwiWindow) -> u64 {
-	let mut surface = 0;
+pub fn create_surface(instance: VkInstance, native_window: &::AwiWindow)
+	-> VkSurfaceKHR
+{
+	let mut surface = unsafe { mem::uninitialized() };
 	let surface_create_info = SurfaceCreateInfo {
 		s_type: VkStructureType::SurfaceCreateInfo,
 		p_next: NULL,
@@ -84,10 +92,10 @@ pub fn create_surface(instance: *mut Void, native_window: &::AwiWindow) -> u64 {
 	unsafe {
 		extern "system" {
 			fn vkCreateWin32SurfaceKHR(
-				instance: *mut Void,
+				instance: VkInstance,
 				pCreateInfo: *const SurfaceCreateInfo,
 				pAllocator: *mut Void,
-				surface: *mut u64) -> VkResult;
+				surface: *mut VkSurfaceKHR) -> VkResult;
 		}
 		check_error(ERROR, vkCreateWin32SurfaceKHR(
 			instance, &surface_create_info, NULL, &mut surface
@@ -98,8 +106,10 @@ pub fn create_surface(instance: *mut Void, native_window: &::AwiWindow) -> u64 {
 }
 
 #[cfg(target_os = "android")]
-pub fn create_surface(instance: *mut Void, native_window: &::AwiWindow) -> u64 {
-	let mut surface = 0;
+pub fn create_surface(instance: VkInstance, native_window: &::AwiWindow)
+	-> VkSurfaceKHR
+{
+	let mut surface = unsafe { mem::uninitialized() };
 	let surface_create_info = SurfaceCreateInfo {
 		s_type: VkStructureType::SurfaceCreateInfo,
 		p_next: NULL,
@@ -109,10 +119,10 @@ pub fn create_surface(instance: *mut Void, native_window: &::AwiWindow) -> u64 {
 
 	unsafe {
 		extern "system" {
-			fn vkCreateAndroidSurfaceKHR(instance: *mut Void,
+			fn vkCreateAndroidSurfaceKHR(instance: VkInstance,
 				pCreateInfo: *const SurfaceCreateInfo,
 				pAllocator: *mut Void,
-				surface: *mut u64) -> VkResult;
+				surface: *mut VkSurfaceKHR) -> VkResult;
 		}
 		check_error(ERROR, vkCreateAndroidSurfaceKHR(
 			instance, &surface_create_info, NULL, &mut surface
@@ -122,8 +132,8 @@ pub fn create_surface(instance: *mut Void, native_window: &::AwiWindow) -> u64 {
 	surface
 }
 
-pub fn create_surface(instance: *mut Void, connection: WindowConnection)
-	-> u64
+pub fn create_surface(instance: VkInstance, connection: WindowConnection)
+	-> VkSurfaceKHR
 {
 	match connection {
 		WindowConnection::Xcb(connection,window) => {

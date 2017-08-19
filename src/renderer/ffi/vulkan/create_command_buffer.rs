@@ -6,9 +6,13 @@
 //
 // src/renderer/ffi/vulkan/create_command_buffer.rs
 
-use ami::*;
+use std::mem;
 use std::ffi::CString;
-use super::{ VkResult, VkStructureType, check_error };
+
+use ami::*;
+
+use super::ffi::types::*;
+use super::check_error;
 
 #[repr(C)]
 enum VkCommandBufferLevel {
@@ -32,11 +36,11 @@ struct VkCommandBufferAllocateInfo {
 	command_buffer_count: u32,
 }
 
-pub fn create_command_buffer(gpu_interface: *mut Void,
-	present_queue_index: u32) -> (*mut Void, u64)
+pub fn create_command_buffer(gpu_interface: VkDevice, present_queue_index: u32)
+	-> (VkCommandBuffer, u64)
 {
 	let mut command_pool = 0;
-	let mut command_buffer = NULL.as_mut_ptr();
+	let mut command_buffer = unsafe { mem::uninitialized() };
 
 	let create_info = VkCommandPoolCreateInfo {
 		s_type: VkStructureType::CommandPoolCreateInfo,
@@ -47,10 +51,10 @@ pub fn create_command_buffer(gpu_interface: *mut Void,
 
 	unsafe {
 		extern "system" {
-			fn vkGetDeviceProcAddr(instance: *mut Void,
+			fn vkGetDeviceProcAddr(instance: VkDevice,
 				name: *const i8)
 			-> extern "system" fn(
-				device: *mut Void,
+				device: VkDevice,
 				pCreateInfo: *const VkCommandPoolCreateInfo,
 				pAllocator: *mut Void,
 				pCommandPool: *mut u64) -> VkResult;
@@ -73,12 +77,12 @@ pub fn create_command_buffer(gpu_interface: *mut Void,
 
 	unsafe {
 		extern "system" {
-			fn vkGetDeviceProcAddr(instance: *mut Void,
+			fn vkGetDeviceProcAddr(instance: VkDevice,
 				name: *const i8)
 			-> extern "system" fn(
-				device: *mut Void,
+				device: VkDevice,
 				ai: *const VkCommandBufferAllocateInfo,
-				cmd_buffs: *mut *mut Void) -> VkResult;
+				cmd_buffs: *mut VkCommandBuffer) -> VkResult;
 		}
 		let name = CString::new("vkAllocateCommandBuffers").unwrap();
 		check_error("Failed to create vulkan instance.",

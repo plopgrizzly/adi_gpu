@@ -6,20 +6,20 @@
 //
 // src/renderer/mod.rs
 
-use ami::Void;
+use std::mem;
 
-mod ffi;
+use ami::Void;
+use window::Window;
+use window::WindowConnection;
 
 use self::ffi::vulkan;
 use self::ffi::NativeRenderer;
 use RenderOps;
 
-use window::Window;
-use window::WindowConnection;
+mod ffi;
 
 type VkQueue = usize;
 
-type VkSurface = u64;
 type VkSwapchain = u64;
 type VkImage = u64;
 type VkFramebuffer = u64;
@@ -28,7 +28,6 @@ type VkDescriptorPool = u64;
 type VkDescriptorSetLayout = u64;
 type VkDescriptorSet = u64;
 type VkImageView = u64;
-type VkDeviceMemory = u64;
 type VkRenderPass = u64;
 type VkPipelineLayout = u64;
 type VkSemaphore = u64;
@@ -40,17 +39,18 @@ type VkPipeline = u64;
 type VkC = u32; // Size of enum is 4 bytes
 
 use self::ffi::vulkan::ffi::types::*;
+use self::ffi::vulkan::ffi::Connection;
 
 #[repr(C)]
-#[derive(Copy, Clone)] // TODO: don't copy this.
+// #[derive(Copy, Clone)] // TODO: don't copy this.
 pub struct Vw {
-	pub instance: *mut Void, // Vulkan instance
-	surface: VkSurface, // Surface that we render to.
+	pub instance: VkInstance, // Vulkan instance
+	surface: VkSurfaceKHR, // Surface that we render to.
 	present_queue_index: u32,
 	present_queue: VkQueue,
 	gpu: VkPhysicalDevice,
-	device: *mut Void, // The logical device
-	command_buffer: *mut Void,
+	device: VkDevice, // The logical device
+	command_buffer: VkCommandBuffer,
 	swapchain: VkSwapchain,
 	width:u32, height:u32, // Swapchain Dimensions.
 	present_images: [VkImage; 2], // 2 for double-buffering
@@ -86,7 +86,7 @@ impl Shader {
 		let mut shader = Shader { vertex: 0, fragment: 0,
 			textures, has_data: 0 };
 		unsafe {
-			vw_vulkan_shader(&mut shader, *vw, &vert[0],
+			vw_vulkan_shader(&mut shader, vw, &vert[0],
 				vert.len() as u32, &frag[0], frag.len() as u32);
 		}
 		shader
@@ -102,7 +102,7 @@ pub struct Style {
 }
 
 #[repr(C)]
-#[derive(PartialEq,Copy,Clone)]
+#[derive(Copy,Clone)]
 pub struct NativeTexture {
 	mappable_image: VkImage,
 	mappable_memory: VkDeviceMemory,
@@ -253,9 +253,10 @@ pub struct VwInstance {
 }
 
 extern {
-	fn vw_vulkan_shape(a: *mut VwShape, b: Vw, c: *const f32, d: u32) -> ();
+	fn vw_vulkan_shape(a: *mut VwShape, b: *const Vw, c: *const f32, d: u32)
+		-> ();
 //
-	fn vw_vulkan_shader(a: *mut Shader, b: Vw, c: *const u8, d: u32,
+	fn vw_vulkan_shader(a: *mut Shader, b: *const Vw, c: *const u8, d: u32,
 		e: *const u8, f: u32) -> ();
 	fn vw_vulkan_pipeline(z: *mut Style, a: *mut Vw, b: *const Shader,
 		c: u32);
@@ -311,30 +312,35 @@ pub fn close(renderer: &mut Vw) {
 }
 
 impl Vw {
-	pub fn new(window_name: &str, window_connection: WindowConnection) -> Vw {
-		let connection = vulkan::vulkan::Vulkan::new(window_name);
+	pub fn new(window_name: &str, window_connection: WindowConnection) -> (Connection, Vw) {
+		let connection = vulkan::vulkan::Vulkan::new(window_name).unwrap();
 
-		let instance = (connection.0).0;
+		let instance = connection.0.vk;
+		let surface = vulkan::create_surface::create_surface(	
+			instance, window_connection);
 
-//		let instance = vulkan::Instance::create(window_name);
-		let surface = vulkan::Surface::create(instance, window_connection);
-		let gpu = vulkan::Gpu::create(&surface);
-		let gpu_interface = vulkan::GpuInterface::create(instance, &gpu);
-		let queue = vulkan::Queue::create(&gpu_interface, &gpu);
-		let command_buffer = vulkan::CommandBuffer::create(&gpu_interface,&gpu);
+		let (gpu, pqi) = unsafe {
+			vulkan::ffi::get_gpu(&connection.0, instance, surface)
+		};
+		let gpu_interface = unsafe {
+			vulkan::ffi::create_device(&connection.0, gpu, pqi)
+		};
+
+		let queue = vulkan::Queue::create(gpu_interface, gpu, pqi);
+		let command_buffer = vulkan::CommandBuffer::create(
+			gpu_interface, gpu, pqi);
 
 		let color_format = unsafe {
 			vulkan::ffi::get_color_format(&connection.0,
-				gpu.native, surface.native)
+				gpu, surface)
 		};
 
 		let mut vw = Vw {
-			instance,
-			surface: surface.native,
-			present_queue_index: gpu.present_queue_index,
+			instance, surface,
+			present_queue_index: pqi,
 			present_queue: queue.native,
-			gpu: gpu.native,
-			device: gpu_interface.native,
+			gpu,
+			device: gpu_interface,
 			command_buffer: command_buffer.native,
 			swapchain: 0,
 			width: 0, height: 0,
@@ -346,7 +352,7 @@ impl Vw {
 			present_image_views: [0, 0],
 			depth_image: 0,
 			depth_image_view: 0,
-			depth_image_memory: 0,
+			depth_image_memory: unsafe { mem::zeroed() },
 			render_pass: 0,
 			next_image_index: 0,
 			presenting_complete_sem: 0,
@@ -356,7 +362,7 @@ impl Vw {
 
 		swapchain_resize(&mut vw);
 
-		vw
+		(connection.0, vw)
 	}
 }
 
@@ -374,6 +380,7 @@ fn projection(ratio: f32, fov: f32) -> ::Transform {
 
 pub struct Renderer {
 	vw: Vw,
+	connection: Connection,
 	shapes: Vec<Shape>,
 	style_solid: Style,
 	projection: ::Transform,
@@ -386,7 +393,7 @@ impl Renderer {
 //		let native = NativeRenderer::new(window_name,
 //			window_connection.clone());
 
-		let mut vw = Vw::new(window_name, window_connection);
+		let (mut connection, mut vw) = Vw::new(window_name, window_connection);
 		let shapes = Vec::new();
 		let shadev = vec![
 			Shader::create(&vw, include_bytes!("../native_renderer/vulkan/res/solid-vert.spv"),
@@ -403,7 +410,7 @@ impl Renderer {
 		let projection = projection(vw.height as f32 / vw.width as f32,
 			90.0);
 
-		Renderer { vw, shapes, style_solid: styles[0], projection }
+		Renderer { vw, connection, shapes, style_solid: styles[0], projection }
 	}
 
 	pub fn update(&mut self) {
@@ -419,7 +426,8 @@ impl Renderer {
 					shape.instance);
 			}
 
-			vulkan::cmd_draw(self.vw.command_buffer,
+			vulkan::cmd_draw(&self.connection,
+				self.vw.command_buffer,
 				shape.shape.vertice_count);
 		}
 
@@ -446,13 +454,13 @@ impl Renderer {
 		let size = vertices.len() as u32;
 		let hastx = false;
 		let mut shape = VwShape {
-			vertex_buffer_memory: 0,
+			vertex_buffer_memory: unsafe { mem::zeroed() },
 			vertex_input_buffer: 0,
 			vertice_count: size / 4,
 		};
 
 		unsafe {
-			vw_vulkan_shape(&mut shape, self.vw, vertices.as_ptr(),
+			vw_vulkan_shape(&mut shape, &self.vw, vertices.as_ptr(),
 				size);
 		}
 
@@ -465,7 +473,7 @@ impl Renderer {
 
 		let matrix = [ color.0, color.1, color.2, color.3 ];
 
-		vulkan::copy_memory(self.vw.device,
+		vulkan::copy_memory(&self.connection, self.vw.device,
 			instance.uniform_memory, &matrix);
 
 		println!("PUSH SHAPE");
@@ -476,5 +484,15 @@ impl Renderer {
 
 	pub fn get_projection(&self) -> ::Transform {
 		::Transform(self.projection.0)
+	}
+}
+
+impl Drop for Renderer {
+	fn drop(&mut self) -> () {
+		unsafe {
+			ffi::vulkan::ffi::destroy_surface(&self.connection,
+				self.vw.surface);
+			ffi::vulkan::ffi::destroy_instance(&self.connection);
+		}
 	}
 }

@@ -6,28 +6,27 @@
 //
 // src/renderer/ffi/vulkan/vulkan.rs
 
-use ami::Void;
-use super::ffi as vulkan;
 use std::ptr;
+
+use ami::Void;
+
+use super::ffi as vulkan;
+use super::ffi::types::*;
 
 pub struct Vulkan(pub vulkan::Connection);
 
 impl Vulkan {
-	pub fn new(app_name: &str) -> Self {
-		let dl = unsafe { vulkan::load_dl() };
+	pub fn new(app_name: &str) -> Result<Self, String> {
+		let connection = unsafe { vulkan::load(app_name) };
 
-		if dl.dl_handle.is_null() {
-			return Vulkan((ptr::null_mut(), dl));
+		if connection.lib.is_null() {
+			return Err("Failed to link to Vulkan.".to_string());
 		}
 
-		let instance = unsafe {
-			vulkan::create_instance(dl.dl_handle, app_name)
-		};
-
-		Vulkan((instance, dl))
+		Ok(Vulkan(connection))
 	}
 
-	pub fn native(&self) -> *mut Void {
-		(self.0).0
+	pub fn native(&self) -> VkInstance {
+		self.0.vk
 	}
 }

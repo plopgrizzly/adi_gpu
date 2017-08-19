@@ -6,20 +6,23 @@
 //
 // src/renderer/ffi/vulkan/create_queue.rs
 
-use ami::*;
 use std::ffi::CString;
 
-pub fn create_queue(gpu_interface: *mut Void, present_queue_index: u32)
+use ami::*;
+
+use super::ffi::types::*;
+
+pub fn create_queue(gpu_interface: VkDevice, present_queue_index: u32)
 	-> usize
 {
 	let mut queue = 0;
 
 	unsafe {
 		extern "system" {
-			fn vkGetDeviceProcAddr(instance: *mut Void,
+			fn vkGetDeviceProcAddr(device: VkDevice,
 				name: *const i8)
 			-> extern "system" fn(
-				physicalDevice: *mut Void,
+				device: VkDevice,
 				queueFamilyIndex: u32, queueIndex: u32,
 				pQueue: *mut usize) -> ();
 		}

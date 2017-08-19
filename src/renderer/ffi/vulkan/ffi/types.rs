@@ -6,11 +6,21 @@
 //
 // src/renderer/ffi/vulkan/ffi/types.rs
 
+use std::fmt;
 use ami::Void;
 
-pub type VkSurfaceKHR = u64;
-pub type VkPhysicalDevice = *mut Void;
-pub type VkInstance = *mut Void;
+pub type VkDeviceSize = u64;
+pub type VkFlags = u32;
+
+// Non-Dispatchable Handles
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkSurfaceKHR(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkDeviceMemory(u64);
+
+// Dispatchable Handles
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkDevice(*mut Void);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkPhysicalDevice(*mut Void);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkInstance(*mut Void);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkCommandBuffer(*mut Void);
 
 #[repr(C)]
 pub struct VkSurfaceFormatKHR {
@@ -19,12 +29,34 @@ pub struct VkSurfaceFormatKHR {
 }
 
 #[repr(C)]
+pub struct VkApplicationInfo {
+	pub s_type: VkStructureType,
+	pub p_next: *mut Void,
+	pub p_application_name: *const i8,
+	pub application_version: u32,
+	pub p_engine_name: *const i8,
+	pub engine_version: u32,
+	pub api_version: u32,
+}
+
+#[repr(C)]
+pub struct VkInstanceCreateInfo {
+	pub s_type: VkStructureType,
+	pub p_next: *mut Void,
+	pub flags: u32,
+	pub p_application_info: *const VkApplicationInfo,
+	pub enabled_layer_count: u32,
+	pub pp_enabled_layer_names: *const *const i8,
+	pub enabled_extension_count: u32,
+	pub pp_enabled_extension_names: *const *const i8,
+}
+
+#[repr(C)] #[allow(dead_code)]
 pub enum VkColorSpaceKHR {
 	SRGB_NONLINEAR_KHR = 0,
 }
 
-#[derive(PartialEq, Copy, Clone)] // TODO: Vw requires Copy
-#[repr(C)]
+#[repr(C)] #[allow(dead_code)] #[derive(PartialEq)]
 pub enum VkFormat {
 	UNDEFINED = 0,
 	R4G4_UNORM_PACK8 = 1,
@@ -211,4 +243,83 @@ pub enum VkFormat {
 	ASTC_12x10_SRGB_BLOCK = 182,
 	ASTC_12x12_UNORM_BLOCK = 183,
 	ASTC_12x12_SRGB_BLOCK = 184,
+}
+
+#[repr(C)] #[allow(dead_code)]
+pub enum VkStructureType {
+	ApplicationInfo = 0,
+	InstanceCreateInfo = 1,
+	DeviceQueueCreateInfo = 2,
+	DeviceCreateInfo = 3,
+	MemoryAllocateInfo = 5,
+	BufferCreateInfo = 12,
+	ImageCreateInfo = 14,
+	ImageViewCreateInfo = 15,
+	PipelineCacheCreateInfo = 17,
+	PipelineLayoutCreateInfo = 30,
+	SamplerCreateInfo = 31,
+	DescriptorSetLayoutCreateInfo = 32,
+	RenderPassCreateInfo = 38,
+	CommandPoolCreateInfo = 39,
+	CommandBufferAllocateInfo = 40,
+	SwapchainCreateInfo = 1000001000,
+	#[cfg(unix)]
+	SurfaceCreateInfo = 1000005000, // XCB
+	#[cfg(target_os = "windows")]
+	SurfaceCreateInfo = 1000009000, // Win32
+	#[cfg(target_os = "android")]
+	SurfaceCreateInfo = 1000008000, // Android
+}
+
+#[repr(C)] #[allow(dead_code)]
+pub enum VkResult {
+	Success = 0,
+	NotReady = 1,
+	Timeout = 2,
+	EventSet = 3,
+	EventReset = 4,
+	Incomplete = 5,
+	OutOfHostMemory = -1,
+	OutOfDeviceMemory = -2,
+	InitFailed = -3,
+	DeviceLost = -4,
+	MemoryMapFailed = -5,
+	LayerNotPresent = -6,
+	ExtNotPresent = -7,
+	FeatureNotPresent = -8,
+	IncompatDriver = -9,
+	TooManyObjects = -10,
+	BadFormat = -11,
+	FragmentedPool = -12,
+	Other = -1024,
+}
+
+// // //
+
+impl fmt::Display for VkResult {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match *self {
+
+		VkResult::Success => write!(f, "Success"),
+		VkResult::NotReady => write!(f, "Not Ready"),
+		VkResult::Timeout => write!(f, "Timeout"),
+		VkResult::EventSet => write!(f, "Event Set"),
+		VkResult::EventReset => write!(f, "Event Reset"),
+		VkResult::Incomplete => write!(f, "Incomplete"),
+		VkResult::OutOfHostMemory => write!(f, "Out Of Host Memory"),
+		VkResult::OutOfDeviceMemory => write!(f, "Out Of GPU Memory"),
+		VkResult::InitFailed => write!(f, "Init Failed"),
+		VkResult::DeviceLost => write!(f, "Device Lost"),
+		VkResult::MemoryMapFailed => write!(f, "Memory Map Failed"),
+		VkResult::LayerNotPresent => write!(f, "Layer Not Present"),
+		VkResult::ExtNotPresent => write!(f, "Extension Not Present"),
+		VkResult::FeatureNotPresent => write!(f, "Feature Not Present"),
+		VkResult::IncompatDriver => write!(f, "Incompatible Driver"),
+		VkResult::TooManyObjects => write!(f, "Too Many Objects"),
+		VkResult::BadFormat => write!(f, "Format Not Supported"),
+		VkResult::FragmentedPool => write!(f, "Fragmented Pool"),
+		_ => write!(f, "Unknown Error"),
+
+		}
+	}
 }
