@@ -325,11 +325,14 @@ impl Vw {
 		let gpu_interface = unsafe {
 			vulkan::ffi::create_device(&connection.0, gpu, pqi)
 		};
-
-		let queue = vulkan::Queue::create(gpu_interface, gpu, pqi);
-		let command_buffer = vulkan::CommandBuffer::create(
-			gpu_interface, gpu, pqi);
-
+		let present_queue = unsafe {
+			vulkan::ffi::create_queue(&connection.0, gpu_interface,
+				pqi)
+		};
+		let command_buffer = unsafe {
+			vulkan::ffi::create_command_buffer(&connection.0,
+				gpu_interface, pqi)
+		}.0;
 		let color_format = unsafe {
 			vulkan::ffi::get_color_format(&connection.0,
 				gpu, surface)
@@ -338,10 +341,9 @@ impl Vw {
 		let mut vw = Vw {
 			instance, surface,
 			present_queue_index: pqi,
-			present_queue: queue.native,
-			gpu,
+			present_queue, gpu,
 			device: gpu_interface,
-			command_buffer: command_buffer.native,
+			command_buffer,
 			swapchain: 0,
 			width: 0, height: 0,
 			present_images: [0, 0],

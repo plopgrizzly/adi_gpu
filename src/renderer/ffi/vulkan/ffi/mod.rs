@@ -45,6 +45,7 @@ pub struct Connection {
 	pub vk: VkInstance,
 	pub lib: *mut Void,
 	vksym: unsafe extern "system" fn(VkInstance, *const i8) -> *mut Void,
+	vkdsym: unsafe extern "system" fn(VkDevice, *const i8) -> *mut Void,
 	mapmem: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
 		VkDeviceSize, VkDeviceSize, VkFlags, *mut *mut f32)
 		-> VkResult,
@@ -64,6 +65,7 @@ pub unsafe fn load(app_name: &str) -> Connection {
 
 	Connection {
 		vk, lib, vksym,
+		vkdsym: vk_sym(vk, vksym, b"vkGetDeviceProcAddr\0"),
 		mapmem: vk_sym(vk, vksym, b"vkMapMemory\0"),
 		draw: vk_sym(vk, vksym, b"vkCmdDraw\0"),
 		unmap: vk_sym(vk, vksym, b"vkUnmapMemory\0"),
@@ -84,8 +86,20 @@ unsafe fn vk_sym<T>(vk: VkInstance, vksym: unsafe extern "system" fn(
 	mem::transmute_copy::<*mut Void, T>(&fnPtr)
 }
 
+unsafe fn vkd_sym<T>(device: VkDevice, vkdsym: unsafe extern "system" fn(
+	VkDevice, *const i8) -> *mut Void, name: &[u8]) -> T
+{
+	let fnPtr = vkdsym(device, &name[0] as *const _ as *const i8);
+
+	mem::transmute_copy::<*mut Void, T>(&fnPtr)
+}
+
 unsafe fn sym<T>(connection: &Connection, name: &[u8]) -> T {
 	vk_sym(connection.vk, connection.vksym, name)
+}
+
+unsafe fn dsym<T>(connection: &Connection, device: VkDevice, name: &[u8]) -> T {
+	vkd_sym(device, connection.vkdsym, name)
 }
 
 unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
@@ -323,6 +337,97 @@ pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 	vk_create_device(gpu, &create_info, NULL.as_mut_ptr(), &mut device);
 
 	device
+}
+
+pub unsafe fn create_queue(connection: &Connection, device: VkDevice, pqi: u32)
+	-> usize
+{
+	// Load function
+	type VkGetDeviceQueue = extern "system" fn(device: VkDevice,
+		queueFamilyIndex: u32, queueIndex: u32, pQueue: *mut usize)
+		-> ();
+	let vk_get_device_queue: VkGetDeviceQueue = dsym(connection, device,
+		b"vkGetDeviceQueue\0");
+
+	// Set Data
+	let mut queue = 0;
+
+	// Run Function
+	vk_get_device_queue(device, pqi, 0, &mut queue);
+
+	// Return
+	queue
+}
+
+pub unsafe fn create_command_buffer(connection: &Connection, device: VkDevice,
+	pqi: u32) -> (VkCommandBuffer, u64)
+{
+	#[repr(C)]
+	enum VkCommandBufferLevel {
+		Primary = 0,
+	}
+
+	#[repr(C)]
+	struct VkCommandPoolCreateInfo {
+		s_type: VkStructureType,
+		p_next: *mut Void,
+		flags: u32,
+		queue_family_index: u32,
+	}
+
+	#[repr(C)]
+	struct VkCommandBufferAllocateInfo {
+		s_type: VkStructureType,
+		p_next: *mut Void,
+		command_pool: u64,
+		level: VkCommandBufferLevel,
+		command_buffer_count: u32,
+	}
+
+	// Load function
+	type VkCreateCommandPool = extern "system" fn(device: VkDevice,
+		pCreateInfo: *const VkCommandPoolCreateInfo,
+		pAllocator: *mut Void, pCommandPool: *mut u64) -> VkResult;
+	let vk_create_command_pool: VkCreateCommandPool = dsym(connection,
+		device, b"vkCreateCommandPool\0");
+
+	// Set Data
+	let mut command_pool = 0;
+	let mut command_buffer = unsafe { mem::uninitialized() };
+
+	let create_info = VkCommandPoolCreateInfo {
+		s_type: VkStructureType::CommandPoolCreateInfo,
+		p_next: NULL.as_mut_ptr(),
+		flags: 0x00000002, // Reset Command Buffer
+		queue_family_index: pqi,
+	};
+
+	// Run Function
+	vk_create_command_pool(device, &create_info, NULL.as_mut_ptr(),
+		&mut command_pool);
+
+	// Load Function
+	type VkAllocateCommandBuffers = extern "system" fn(device: VkDevice,
+		ai: *const VkCommandBufferAllocateInfo,
+		cmd_buffs: *mut VkCommandBuffer) -> VkResult;
+	let vk_allocate_command_buffers: VkAllocateCommandBuffers = dsym(
+		connection, device, b"vkAllocateCommandBuffers\0");
+
+	// Set Data
+	let allocate_info = VkCommandBufferAllocateInfo {
+		s_type: VkStructureType::CommandBufferAllocateInfo,
+		p_next: NULL.as_mut_ptr(),
+		command_pool: command_pool,
+		level: VkCommandBufferLevel::Primary,
+		command_buffer_count: 1,
+	};
+
+	// Run Function
+	vk_allocate_command_buffers(device, &allocate_info,
+		&mut command_buffer);
+
+	// Return
+	(command_buffer, command_pool)
 }
 
 pub unsafe fn map_memory(connection: &Connection, device: VkDevice,

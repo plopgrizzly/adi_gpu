@@ -16,10 +16,6 @@ pub mod vulkan;
 // TODO: absorb into ffi, only once internal todo is resolved.
 pub mod create_surface;
 
-mod create_command_buffer;
-mod create_gpu_interface;
-mod create_queue;
-
 use self::ffi::types::*;
 
 pub struct VulkanRenderer {
@@ -37,7 +33,7 @@ impl ::RenderOps for VulkanRenderer {
 	}
 }
 
-pub struct Queue { pub native: usize }
+/*pub struct Queue { pub native: usize }
 impl Queue {
 	pub fn create(gpu_interface: VkDevice, gpu: VkPhysicalDevice,
 		pqi: u32) -> Queue
@@ -46,9 +42,9 @@ impl Queue {
 			native: create_queue::create_queue(gpu_interface, pqi)
 		}
 	}
-}
+}*/
 
-pub struct CommandBuffer { pub native: VkCommandBuffer, pub command_pool: u64 }
+/*pub struct CommandBuffer { pub native: VkCommandBuffer, pub command_pool: u64 }
 impl CommandBuffer {
 	pub fn create(gpu_interface: VkDevice, gpu: VkPhysicalDevice,
 		pqi: u32) -> CommandBuffer
@@ -58,7 +54,7 @@ impl CommandBuffer {
 
 		CommandBuffer{ native: cmd_buffer.0,command_pool: cmd_buffer.1 }
 	}
-}
+}*/
 
 // TODO: MAKE SURE WINDOWS DOESNT BREAK WITHOUT THIS
 /* extern {
