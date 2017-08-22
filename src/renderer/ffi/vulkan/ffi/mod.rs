@@ -11,9 +11,8 @@ pub mod types;
 use self::types::*;
 
 use ami::{ Void, NULL };
-use std::mem;
+use std::{ mem, ptr, u64 };
 use std::ffi::CString;
-use std::ptr;
 
 const VERSION: (u32, &'static str) = (4194304, "vulkan 1.0.0");
 
@@ -56,6 +55,26 @@ pub struct Connection {
 		*mut VkSwapchainKHR) -> VkResult,
 	get_swapcount: unsafe extern "system" fn(VkDevice, VkSwapchainKHR,
 		*mut u32, *mut VkImage) -> VkResult,
+	create_fence: unsafe extern "system" fn(VkDevice,
+		*const VkFenceCreateInfo, *const Void, *mut VkFence)
+		-> VkResult,
+	begin_cmdbuff: unsafe extern "system" fn(VkCommandBuffer,
+		*const VkCommandBufferBeginInfo) -> VkResult,
+	pipeline_barrier: unsafe extern "system" fn(VkCommandBuffer,
+		VkPipelineStage, VkPipelineStage, VkFlags, u32,
+		*const VkMemoryBarrier, u32, *const VkBufferMemoryBarrier, u32,
+		*const VkImageMemoryBarrier) -> (),
+	end_cmdbuff: unsafe extern "system" fn(VkCommandBuffer) -> VkResult,
+	queue_submit: unsafe extern "system" fn(VkQueue, u32,
+		*const VkSubmitInfo, VkFence) -> VkResult,
+	wait_fence: unsafe extern "system" fn(VkDevice, u32, *const VkFence,
+		VkBool32, u64) -> VkResult,
+	reset_fence: unsafe extern "system" fn(VkDevice, u32, *const VkFence)
+		-> VkResult,
+	reset_cmdbuff: unsafe extern "system" fn(VkCommandBuffer, VkFlags),
+	create_imgview: unsafe extern "system" fn(VkDevice,
+		*const VkImageViewCreateInfo, *const Void, *mut VkImageView)
+		-> VkResult,
 }
 
 pub unsafe fn load(app_name: &str) -> Connection {
@@ -75,6 +94,15 @@ pub unsafe fn load(app_name: &str) -> Connection {
 		unmap: vk_sym(vk, vksym, b"vkUnmapMemory\0"),
 		new_swapchain: vk_sym(vk, vksym, b"vkCreateSwapchainKHR\0"),
 		get_swapcount: vk_sym(vk, vksym, b"vkGetSwapchainImagesKHR\0"),
+		create_fence: vk_sym(vk, vksym, b"vkCreateFence\0"),
+		begin_cmdbuff: vk_sym(vk, vksym, b"vkBeginCommandBuffer\0"),
+		pipeline_barrier: vk_sym(vk, vksym, b"vkCmdPipelineBarrier\0"),
+		end_cmdbuff: vk_sym(vk, vksym, b"vkEndCommandBuffer\0"),
+		queue_submit: vk_sym(vk, vksym, b"vkQueueSubmit\0"),
+		wait_fence: vk_sym(vk, vksym, b"vkWaitForFences\0"),
+		reset_fence: vk_sym(vk, vksym, b"vkResetFences\0"),
+		reset_cmdbuff: vk_sym(vk, vksym, b"vkResetCommandBuffer\0"),
+		create_imgview: vk_sym(vk, vksym, b"vkCreateImageView\0"),
 	}
 }
 
@@ -347,17 +375,17 @@ pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 }
 
 pub unsafe fn create_queue(connection: &Connection, device: VkDevice, pqi: u32)
-	-> usize
+	-> VkQueue
 {
 	// Load function
 	type VkGetDeviceQueue = extern "system" fn(device: VkDevice,
-		queueFamilyIndex: u32, queueIndex: u32, pQueue: *mut usize)
+		queueFamilyIndex: u32, queueIndex: u32, pQueue: *mut VkQueue)
 		-> ();
 	let vk_get_device_queue: VkGetDeviceQueue = dsym(connection, device,
 		b"vkGetDeviceQueue\0");
 
 	// Set Data
-	let mut queue = 0;
+	let mut queue = mem::uninitialized();
 
 	// Run Function
 	vk_get_device_queue(device, pqi, 0, &mut queue);
@@ -566,9 +594,11 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	VkPresentModeKHR::Fifo
 }
 
-pub unsafe fn create_swapchain(connection: &Connection, surface: VkSurfaceKHR,
-	device: VkDevice, swapchain: &mut VkSwapchainKHR, width: u32,
-	height: u32, image_count: &mut u32, color_format: VkFormat,
+#[inline(always)]
+pub(in renderer) unsafe fn create_swapchain(
+	connection: &Connection, surface: VkSurfaceKHR, device: VkDevice,
+	swapchain: &mut VkSwapchainKHR, width: u32, height: u32,
+	image_count: &mut u32, color_format: VkFormat,
 	present_mode: VkPresentModeKHR, swap_images: *mut VkImage)
 {
 	// Set Data
@@ -601,6 +631,112 @@ pub unsafe fn create_swapchain(connection: &Connection, surface: VkSurfaceKHR,
 		ptr::null_mut());
 	(connection.get_swapcount)(device, *swapchain, image_count,
 		swap_images);
+}
+
+#[inline(always)] pub(in renderer) unsafe fn create_image_view(
+	connection: &Connection, device: VkDevice, color_format: &VkFormat,
+	submit_fence: &mut VkFence, image_count: u32,
+	swap_images: &mut [VkImage; 2], image_views: &mut [VkImageView; 2],
+	command_buffer: VkCommandBuffer, present_queue: VkQueue)
+{
+	(connection.create_fence)(
+		device,
+		&VkFenceCreateInfo {
+			s_type: VkStructureType::FenceCreateInfo,
+			p_next: ptr::null(),
+			flags: 0,
+		},
+		ptr::null(),
+		submit_fence
+	);
+
+	for i in 0..(image_count as usize) {
+		(connection.begin_cmdbuff)(
+			command_buffer,
+			&VkCommandBufferBeginInfo {
+				s_type: VkStructureType::CommandBufferBeginInfo,
+				p_next: ptr::null(),
+				flags: VkCommandBufferUsage::OneTimeSubmitBit,
+				p_inheritance_info: ptr::null(),
+			}
+		);
+
+		(connection.pipeline_barrier)(
+			command_buffer,
+			VkPipelineStage::TopOfPipe, 
+			VkPipelineStage::TopOfPipe,
+			0, 0, ptr::null(), 0, ptr::null(), 1,
+			&VkImageMemoryBarrier {
+				s_type: VkStructureType::ImageMemoryBarrier,
+				p_next: ptr::null(),
+				src_access_mask: VkAccess::NoFlags,
+				dst_access_mask: VkAccess::MemoryReadBit,
+				old_layout: VkImageLayout::Undefined,
+				new_layout: VkImageLayout::PresentSrc,
+				src_queue_family_index: !0,
+				dst_queue_family_index: !0,
+				image: swap_images[i],
+				subresource_range: VkImageSubresourceRange {
+					aspect_mask: VkImageAspectFlags::Color,
+					base_mip_level: 0,
+					level_count: 1,
+					base_array_layer: 0,
+					layer_count: 1,
+				},
+			}
+		);
+
+		(connection.end_cmdbuff)(command_buffer);
+
+		(connection.queue_submit)(
+			present_queue,
+			1,
+			&VkSubmitInfo {
+				s_type: VkStructureType::SubmitInfo,
+				p_next: ptr::null(),
+				wait_semaphore_count: 0,
+				wait_semaphores: ptr::null(),
+				wait_dst_stage_mask:
+					&VkPipelineStage::ColorAttachmentOutput,
+				command_buffer_count: 1,
+				p_command_buffers: &command_buffer,
+				signal_semaphore_count: 0,
+				p_signal_semaphores: ptr::null(),
+			},
+			*submit_fence
+		);
+
+		(connection.wait_fence)(device, 1, submit_fence, 1, u64::MAX);
+		(connection.reset_fence)(device, 1, submit_fence);
+		(connection.reset_cmdbuff)(command_buffer, 0);
+
+		(connection.create_imgview)(
+			device,
+			&VkImageViewCreateInfo {
+				s_type: VkStructureType::ImageViewCreateInfo,
+				p_next: ptr::null(),
+				flags: 0,
+				view_type: VkImageViewType::SingleLayer2d,
+				format: color_format.clone(),
+				components: VkComponentMapping {
+					r: VkComponentSwizzle::R,
+					g: VkComponentSwizzle::G,
+					b: VkComponentSwizzle::B,
+					a: VkComponentSwizzle::A,
+				},
+				subresource_range: VkImageSubresourceRange {
+					aspect_mask: VkImageAspectFlags::Color,
+					base_mip_level: 0,
+					level_count: 1,
+					base_array_layer: 0,
+					layer_count: 1,
+				},
+				image: swap_images[i],
+			},
+			ptr::null(),
+			&mut image_views[i]
+		);
+	}
 }
 
 pub unsafe fn destroy_instance(connection: &Connection) -> () {

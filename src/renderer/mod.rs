@@ -17,18 +17,13 @@ use self::ffi::vulkan;
 
 mod ffi;
 
-type VkQueue = usize;
-
 type VkFramebuffer = u64;
-type VkFence = u64;
 type VkDescriptorPool = u64;
 type VkDescriptorSetLayout = u64;
 type VkDescriptorSet = u64;
-type VkImageView = u64;
 type VkRenderPass = u64;
 type VkPipelineLayout = u64;
 type VkSemaphore = u64;
-type VkBuffer = u64;
 type VkShaderModule = u64;
 type VkSampler = u64;
 type VkPipeline = u64;
@@ -277,19 +272,45 @@ extern {
 // TODO: Replaces vw_vulkan_resize
 fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 	extern "C" {
-//		fn vw_vulkan_swapchain(v: *mut Vw) -> ();
-		fn vw_vulkan_resize(v: *mut Vw) -> ();
+		fn vw_vulkan_depth_buffer(v: *mut Vw) -> ();
+		fn vw_vulkan_render_pass(v: *mut Vw) -> ();
+		fn vw_vulkan_framebuffers(v: *mut Vw) -> ();
 	}
 
 	unsafe {
-		vulkan::ffi::create_swapchain(connection, vw.surface, vw.device,
-			&mut vw.swapchain, vw.width, vw.height,
-			&mut vw.image_count, vw.color_format.clone(),
+		// Link swapchain to vulkan instance.
+		vulkan::ffi::create_swapchain(
+			connection,
+			vw.surface,
+			vw.device,
+			&mut vw.swapchain,
+			vw.width, vw.height,
+			&mut vw.image_count,
+			vw.color_format.clone(),
 			vw.present_mode.clone(),
-			&mut vw.present_images[0]); // 
+			&mut vw.present_images[0]);
 
-//		vw_vulkan_swapchain(vw); // Link Swapchain to Vulkan Instance
-		vw_vulkan_resize(vw);
+		// Link Image Views for each framebuffer
+		vulkan::ffi::create_image_view(
+			connection,
+			vw.device,
+			&vw.color_format,
+			&mut vw.submit_fence,
+			vw.image_count,
+			&mut vw.present_images,
+			&mut vw.present_image_views,
+			vw.command_buffer,
+			vw.present_queue,
+		);
+
+		// Link Depth Buffer to swapchain
+		vw_vulkan_depth_buffer(vw);
+
+		// Link Render Pass to swapchain
+		vw_vulkan_render_pass(vw);
+
+		// Link Framebuffers to swapchain
+		vw_vulkan_framebuffers(vw);
 	}
 }
 
@@ -358,10 +379,10 @@ impl Vw {
 			frame_buffers: [0, 0],
 			color_format,
 			image_count,
-			submit_fence: 0,
-			present_image_views: [0, 0],
+			submit_fence: unsafe { mem::zeroed() },
+			present_image_views: [unsafe { mem::zeroed() }; 2],
 			depth_image: unsafe { mem::zeroed() },
-			depth_image_view: 0,
+			depth_image_view: unsafe { mem::zeroed() },
 			depth_image_memory: unsafe { mem::zeroed() },
 			render_pass: 0,
 			next_image_index: 0,
@@ -466,7 +487,7 @@ impl Renderer {
 		let hastx = false;
 		let mut shape = VwShape {
 			vertex_buffer_memory: unsafe { mem::zeroed() },
-			vertex_input_buffer: 0,
+			vertex_input_buffer: unsafe { mem::zeroed() },
 			vertice_count: size / 4,
 		};
 

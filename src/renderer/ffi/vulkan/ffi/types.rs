@@ -18,15 +18,115 @@ pub type VkBool32 = u32;
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkDeviceMemory(u64);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkImage(u64);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkSwapchainKHR(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkRenderPass(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkFramebuffer(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkFence(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkSemaphore(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkImageView(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkBuffer(u64);
 
 // Dispatchable Handles
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkDevice(*mut Void);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkPhysicalDevice(*mut Void);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkInstance(*mut Void);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkCommandBuffer(*mut Void);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkQueue(*mut Void);
 
-#[repr(C)]
-pub struct VkSwapchainCreateInfoKHR {
+#[repr(C)] pub struct VkImageMemoryBarrier {
+	pub s_type: VkStructureType,
+	pub p_next: *const Void,
+	pub src_access_mask: VkAccess,
+	pub dst_access_mask: VkAccess,
+	pub old_layout: VkImageLayout,
+	pub new_layout: VkImageLayout,
+	pub src_queue_family_index: u32,
+	pub dst_queue_family_index: u32,
+	pub image: VkImage,
+	pub subresource_range: VkImageSubresourceRange,
+}
+
+#[repr(C)] pub struct VkSubmitInfo {
+	pub s_type: VkStructureType,
+	pub p_next: *const Void,
+	pub wait_semaphore_count: u32,
+	pub wait_semaphores: *const VkSemaphore,
+	pub wait_dst_stage_mask: *const VkPipelineStage,
+	pub command_buffer_count: u32,
+	pub p_command_buffers: *const VkCommandBuffer,
+	pub signal_semaphore_count: u32,
+	pub p_signal_semaphores: *const VkSemaphore,
+}
+
+#[repr(C)] pub struct VkBufferMemoryBarrier {
+	pub s_type: VkStructureType,
+	pub p_next: *const Void,
+	pub src_access_mask: VkFlags,
+	pub dst_access_mask: VkFlags,
+	pub src_queue_family_index: u32,
+	pub dst_queue_family_index: u32,
+	pub buffer: VkBuffer,
+	pub offset: VkDeviceSize,
+	pub size: VkDeviceSize,
+}
+
+#[repr(C)] pub struct VkMemoryBarrier {
+	pub s_type: VkStructureType,
+	pub p_next: *const Void,
+	pub src_access_mask: VkFlags,
+	pub dst_access_mask: VkFlags,
+}
+
+#[repr(C)] pub struct VkCommandBufferInheritanceInfo {
+	pub s_type: VkStructureType,
+	pub p_next: *const Void,
+	pub render_pass: VkRenderPass,
+	pub subpass: u32,
+	pub framebuffer: VkFramebuffer,
+	pub occlusion_query_enable: VkBool32,
+	pub query_flags: VkFlags,
+	pub pipeline_statistics: VkFlags,
+}
+
+#[repr(C)] pub struct VkFenceCreateInfo {
+	pub s_type: VkStructureType,
+	pub p_next: *const Void,
+	pub flags: VkFlags,
+}
+
+#[repr(C)] pub struct VkCommandBufferBeginInfo {
+	pub s_type: VkStructureType,
+	pub p_next: *const Void,
+	pub flags: VkCommandBufferUsage,
+	pub p_inheritance_info: *const VkCommandBufferInheritanceInfo,
+}
+
+#[repr(C)] pub struct VkImageSubresourceRange {
+	pub aspect_mask: VkImageAspectFlags,
+	pub base_mip_level: u32,
+	pub level_count: u32,
+	pub base_array_layer: u32,
+	pub layer_count: u32,
+}
+
+#[repr(C)] pub struct VkComponentMapping {
+	pub r: VkComponentSwizzle,
+	pub g: VkComponentSwizzle,
+	pub b: VkComponentSwizzle,
+	pub a: VkComponentSwizzle,
+}
+
+#[repr(C)] pub struct VkImageViewCreateInfo {
+	pub s_type: VkStructureType,
+	pub p_next: *const Void,
+	pub flags: VkFlags,
+	pub image: VkImage,
+	pub view_type: VkImageViewType,
+	pub format: VkFormat,
+	pub components: VkComponentMapping,
+	pub subresource_range: VkImageSubresourceRange,
+}
+
+#[repr(C)] pub struct VkSwapchainCreateInfoKHR {
 	pub s_type: VkStructureType,
 	pub p_next: *const Void,
 	pub flags: VkFlags,
@@ -47,14 +147,12 @@ pub struct VkSwapchainCreateInfoKHR {
 	pub old_swapchain: VkSwapchainKHR,
 }
 
-#[repr(C)]
-pub struct VkExtent2D {
+#[repr(C)] pub struct VkExtent2D {
 	pub width: u32,
 	pub height: u32,
 }
 
-#[repr(C)]
-pub struct VkSurfaceCapabilitiesKHR {
+#[repr(C)] pub struct VkSurfaceCapabilitiesKHR {
 	pub min_image_count: u32,
 	pub max_image_count: u32,
 	pub current_extent: VkExtent2D,
@@ -67,14 +165,12 @@ pub struct VkSurfaceCapabilitiesKHR {
 	pub supported_usage_flags: VkFlags
 }
 
-#[repr(C)]
-pub struct VkSurfaceFormatKHR {
+#[repr(C)] pub struct VkSurfaceFormatKHR {
 	pub format: VkFormat,
 	pub color_space: VkColorSpaceKHR,
 }
 
-#[repr(C)]
-pub struct VkApplicationInfo {
+#[repr(C)] pub struct VkApplicationInfo {
 	pub s_type: VkStructureType,
 	pub p_next: *mut Void,
 	pub p_application_name: *const i8,
@@ -84,8 +180,7 @@ pub struct VkApplicationInfo {
 	pub api_version: u32,
 }
 
-#[repr(C)]
-pub struct VkInstanceCreateInfo {
+#[repr(C)] pub struct VkInstanceCreateInfo {
 	pub s_type: VkStructureType,
 	pub p_next: *mut Void,
 	pub flags: u32,
@@ -96,14 +191,99 @@ pub struct VkInstanceCreateInfo {
 	pub pp_enabled_extension_names: *const *const i8,
 }
 
-#[repr(C)] #[allow(dead_code)]
-pub enum VkSharingMode {
+#[repr(C)] #[allow(dead_code)] pub enum VkAccess {
+	NoFlags = 0x00000000,
+	IndirectCommandReadBit = 0x00000001,
+	IndexReadBit = 0x00000002,
+	VertexAttributeReadBit = 0x00000004,
+	UniformReadBit = 0x00000008,
+	InputAttachmentReadBit = 0x00000010,
+	ShaderReadBit = 0x00000020,
+	ShaderWriteBit = 0x00000040,
+	ColorAttachmentReadBit = 0x00000080,
+	ColorAttachmentWriteBit = 0x00000100,
+	DepthStencilAttachmentReadBit = 0x00000200,
+	DepthStencilAttachmentWriteBit = 0x00000400,
+	TransferReadBit = 0x00000800,
+	TransferWriteBit = 0x00001000,
+	HostReadBit = 0x00002000,
+	HostWriteBit = 0x00004000,
+	MemoryReadBit = 0x00008000,
+	MemoryWriteBit = 0x00010000,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkImageLayout {
+	Undefined = 0,
+	General = 1,
+	ColorAttachmentOptimal = 2,
+	DepthStencilAttachmentOptimal = 3,
+	DepthStencilReadOnlyOptimal = 4,
+	ShaderReadOnlyOptimal = 5,
+	TransferSrcOptimal = 6,
+	TransferDstOptimal = 7,
+	Preinitialized = 8,
+	PresentSrc = 1000001002,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkPipelineStage {
+	TopOfPipe = 0x00000001,
+	DrawIndirect = 0x00000002,
+	VertexInput = 0x00000004,
+	VertexShader = 0x00000008,
+	TessellationControlShader = 0x00000010,
+	TessellationEvaluationShader = 0x00000020,
+	GeometryShader = 0x00000040,
+	FragmentShader = 0x00000080,
+	EarlyFragmentTests = 0x00000100,
+	LateFragmentTests = 0x00000200,
+	ColorAttachmentOutput = 0x00000400,
+	ComputeShader = 0x00000800,
+	Transfer = 0x00001000,
+	BottomOfPipe = 0x00002000,
+	Host = 0x00004000,
+	AllGraphics = 0x00008000,
+	AllCommands = 0x00010000,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkCommandBufferUsage {
+	OneTimeSubmitBit = 0x00000001,
+	RenderPassContinueBit = 0x00000002,
+	SimultaneousUseBit = 0x00000004,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkImageAspectFlags {
+	Color = 0x00000001,
+	Depth = 0x00000002,
+	Stencil = 0x00000004,
+	Metadata = 0x00000008,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkImageViewType {
+	SingleLayer1d = 0,
+	SingleLayer2d = 1,
+	SingleLayer3d = 2,
+	Cube = 3,
+	LayerArray1d = 4,
+	LayerArray2d = 5,
+	LayerArrayCube = 6,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkComponentSwizzle {
+	Identity = 0,
+	Zero = 1,
+	One = 2,
+	R = 3,
+	G = 4,
+	B = 5,
+	A = 6,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkSharingMode {
 	Exclusive = 0,
 	Concurrent = 1,
 }
 
-#[repr(C)] #[allow(dead_code)]
-pub enum VkImageUsage {
+#[repr(C)] #[allow(dead_code)] pub enum VkImageUsage {
 	TransferSrcBit = 0x00000001,
 	TransferDstBit = 0x00000002,
 	SampledBit = 0x00000004,
@@ -122,16 +302,14 @@ pub enum VkPresentModeKHR {
 	FifoRelaxed = 3,
 }
 
-#[repr(C)] #[allow(dead_code)]
-pub enum VkCompositeAlphaFlagBitsKHR {
+#[repr(C)] #[allow(dead_code)] pub enum VkCompositeAlphaFlagBitsKHR {
 	Opaque = 0x00000001,
 	PreMultiplied = 0x00000002,
 	PostMultiplied = 0x00000004,
 	Inherit = 0x00000008,
 }
 
-#[repr(C)] #[allow(dead_code)]
-pub enum VkSurfaceTransformFlagBitsKHR {
+#[repr(C)] #[allow(dead_code)] pub enum VkSurfaceTransformFlagBitsKHR {
 	Identity = 0x00000001,
 	Rotate90 = 0x00000002,
 	Rotate180 = 0x00000004,
@@ -143,13 +321,11 @@ pub enum VkSurfaceTransformFlagBitsKHR {
 	Inherit = 0x00000100,
 }
 
-#[repr(C)] #[allow(dead_code)]
-pub enum VkColorSpaceKHR {
+#[repr(C)] #[allow(dead_code)] pub enum VkColorSpaceKHR {
 	SrgbNonlinearKhr = 0,
 }
 
-#[repr(C)] #[allow(dead_code)] #[derive(PartialEq, Clone)]
-pub enum VkFormat {
+#[repr(C)] #[allow(dead_code)] #[derive(PartialEq, Clone)] pub enum VkFormat {
 	Undefined = 0,
 	R4g4UnormPack8 = 1,
 	R4g4b4a4UnormPack16 = 2,
@@ -337,13 +513,14 @@ pub enum VkFormat {
 	Astc12x12SrgbBlock = 184,
 }
 
-#[repr(C)] #[allow(dead_code)]
-pub enum VkStructureType {
+#[repr(C)] #[allow(dead_code)] pub enum VkStructureType {
 	ApplicationInfo = 0,
 	InstanceCreateInfo = 1,
 	DeviceQueueCreateInfo = 2,
 	DeviceCreateInfo = 3,
+	SubmitInfo = 4,
 	MemoryAllocateInfo = 5,
+	FenceCreateInfo = 8,
 	BufferCreateInfo = 12,
 	ImageCreateInfo = 14,
 	ImageViewCreateInfo = 15,
@@ -354,6 +531,8 @@ pub enum VkStructureType {
 	RenderPassCreateInfo = 38,
 	CommandPoolCreateInfo = 39,
 	CommandBufferAllocateInfo = 40,
+	CommandBufferBeginInfo = 42,
+	ImageMemoryBarrier = 45,
 	SwapchainCreateInfo = 1000001000,
 	#[cfg(unix)]
 	SurfaceCreateInfo = 1000005000, // XCB
@@ -363,8 +542,7 @@ pub enum VkStructureType {
 	SurfaceCreateInfo = 1000008000, // Android
 }
 
-#[repr(C)] #[allow(dead_code)]
-pub enum VkResult {
+#[repr(C)] #[allow(dead_code)] pub enum VkResult {
 	Success = 0,
 	NotReady = 1,
 	Timeout = 2,

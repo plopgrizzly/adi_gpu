@@ -17,90 +17,6 @@ static inline void vw_vulkan_error(const char *msg, VkResult result) {
 	}
 }
 
-static inline void vw_vulkan_image_view(vw_t* vulkan) {
-	VkComponentMapping components = {
-		.r = VK_COMPONENT_SWIZZLE_R, .g = VK_COMPONENT_SWIZZLE_G,
-		.b = VK_COMPONENT_SWIZZLE_B, .a = VK_COMPONENT_SWIZZLE_A,
-	};
-	VkImageViewCreateInfo presentImagesViewCreateInfo = {
-		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.format = vulkan->color_format,
-		.components = components,
-		.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.subresourceRange.baseMipLevel = 0,
-		.subresourceRange.levelCount = 1,
-		.subresourceRange.baseArrayLayer = 0,
-		.subresourceRange.layerCount = 1,
-	};
-
-	VkCommandBufferBeginInfo beginInfo = {
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-	};
-
-	VkFenceCreateInfo fenceCreateInfo = {
-		.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-		.pNext = NULL,
-		.flags = 0,
-	};
-	vkCreateFence(vulkan->device, &fenceCreateInfo, NULL,
-		&vulkan->submit_fence);
-
-	for(uint32_t i = 0; i < vulkan->image_count; i++) {
-		vkBeginCommandBuffer(vulkan->command_buffer, &beginInfo); // TODO: Mem Error
-		presentImagesViewCreateInfo.image = vulkan->present_images[i];
-
-		VkImageMemoryBarrier layoutTransitionBarrier = {
-			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.srcAccessMask = 0,
-			.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-			.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-			.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.image = vulkan->present_images[i],
-		};
-		VkImageSubresourceRange resourceRange = {
-			VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
-		};
-		layoutTransitionBarrier.subresourceRange = resourceRange;
-
-		vkCmdPipelineBarrier(vulkan->command_buffer,
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 
-			1, &layoutTransitionBarrier);
-
-		vkEndCommandBuffer(vulkan->command_buffer);
-
-		VkPipelineStageFlags waitStageMash =
-			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		VkSubmitInfo submitInfo = {
-			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-			.waitSemaphoreCount = 0,
-			.pWaitSemaphores = NULL,
-			.pWaitDstStageMask = &waitStageMash,
-			.commandBufferCount = 1,
-			.pCommandBuffers = &vulkan->command_buffer,
-			.signalSemaphoreCount = 0,
-			.pSignalSemaphores = NULL,
-		};
-		vw_vulkan_error("couldn't submit queue", vkQueueSubmit(
-			vulkan->present_queue, 1, &submitInfo,
-			vulkan->submit_fence));
-
-		vkWaitForFences(vulkan->device, 1, &vulkan->submit_fence,
-			VK_TRUE, UINT64_MAX);
-		vkResetFences(vulkan->device, 1, &vulkan->submit_fence);
-
-		vkResetCommandBuffer(vulkan->command_buffer, 0);
-
-		vw_vulkan_error("Could not create ImageView.", vkCreateImageView(
-			vulkan->device, &presentImagesViewCreateInfo, NULL,
-			&vulkan->present_image_views[i]));
-	}
-}
-
 static uint32_t memory_type_from_properties(const vw_t* vulkan, uint32_t typeBits,
 	VkFlags reqs_mask)
 {
@@ -124,7 +40,7 @@ static uint32_t memory_type_from_properties(const vw_t* vulkan, uint32_t typeBit
 	return 0;
 }
 
-static inline void vw_vulkan_depth_buffer(vw_t* vulkan) {
+void vw_vulkan_depth_buffer(vw_t* vulkan) {
 	VkImageCreateInfo imageCreateInfo = {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 		.imageType = VK_IMAGE_TYPE_2D,
@@ -232,7 +148,7 @@ static inline void vw_vulkan_depth_buffer(vw_t* vulkan) {
 		&vulkan->depth_image_view));
 }
 
-static inline void vw_vulkan_render_pass(vw_t* vulkan) {
+void vw_vulkan_render_pass(vw_t* vulkan) {
 	VkAttachmentDescription passAttachments[2] = {
 		// Color Buffer
 		[0] = {
@@ -282,7 +198,7 @@ static inline void vw_vulkan_render_pass(vw_t* vulkan) {
 		vulkan->device, &render_pass_ci, NULL, &vulkan->render_pass));
 }
 
-static inline void vw_vulkan_framebuffers(vw_t* vulkan) {
+void vw_vulkan_framebuffers(vw_t* vulkan) {
 	VkImageView frameBufferAttachments[2];
 	frameBufferAttachments[1] = vulkan->depth_image_view;
 
@@ -993,13 +909,6 @@ void vw_vulkan_pipeline(vw_pipeline_t* pipeline, vw_t* vulkan, vw_shader_t* shad
 
 	vkDestroyShaderModule(vulkan->device, shaders[0].vertex, NULL);
 	vkDestroyShaderModule(vulkan->device, shaders[0].fragment, NULL);
-}
-
-void vw_vulkan_resize(vw_t* vulkan) {
-	vw_vulkan_image_view(vulkan); // Link Image Views for each framebuffer
-	vw_vulkan_depth_buffer(vulkan); // Link Depth Buffer to swapchain
-	vw_vulkan_render_pass(vulkan); // Link Render Pass to swapchain
-	vw_vulkan_framebuffers(vulkan); // Link Framebuffers to swapchain
 }
 
 void vw_vulkan_swapchain_delete(vw_t* vulkan) {
