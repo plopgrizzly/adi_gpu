@@ -6,10 +6,6 @@
 //
 // src/renderer/ffi/vulkan/vulkan.rs
 
-use std::ptr;
-
-use ami::Void;
-
 use super::ffi as vulkan;
 use super::ffi::types::*;
 

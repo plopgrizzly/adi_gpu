@@ -34,6 +34,7 @@ typedef struct {
 	uint32_t next_image_index;
 	VkSemaphore presenting_complete_sem, rendering_complete_sem;
 	VkDeviceSize offset;
+	VkPresentModeKHR present_mode;
 } vw_t;
 
 typedef struct {

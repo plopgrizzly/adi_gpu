@@ -8,20 +8,17 @@
 
 use std::mem;
 
-use ami::Void;
-use window::Window;
+// use window::Window;
 use window::WindowConnection;
 
 use self::ffi::vulkan;
-use self::ffi::NativeRenderer;
-use RenderOps;
+// use self::ffi::NativeRenderer;
+// use RenderOps;
 
 mod ffi;
 
 type VkQueue = usize;
 
-type VkSwapchain = u64;
-type VkImage = u64;
 type VkFramebuffer = u64;
 type VkFence = u64;
 type VkDescriptorPool = u64;
@@ -51,7 +48,7 @@ pub struct Vw {
 	gpu: VkPhysicalDevice,
 	device: VkDevice, // The logical device
 	command_buffer: VkCommandBuffer,
-	swapchain: VkSwapchain,
+	swapchain: VkSwapchainKHR,
 	width:u32, height:u32, // Swapchain Dimensions.
 	present_images: [VkImage; 2], // 2 for double-buffering
 	frame_buffers: [VkFramebuffer; 2], // 2 for double-buffering
@@ -67,6 +64,7 @@ pub struct Vw {
 	presenting_complete_sem: VkSemaphore,
 	rendering_complete_sem: VkSemaphore,
 	offsets: u64, // VkDeviceSize
+	present_mode: VkPresentModeKHR,
 }
 
 #[repr(C)]
@@ -277,14 +275,20 @@ extern {
 }
 
 // TODO: Replaces vw_vulkan_resize
-fn swapchain_resize(vw: &mut Vw) -> () {
+fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 	extern "C" {
-		fn vw_vulkan_swapchain(v: *mut Vw) -> ();
+//		fn vw_vulkan_swapchain(v: *mut Vw) -> ();
 		fn vw_vulkan_resize(v: *mut Vw) -> ();
 	}
 
 	unsafe {
-		vw_vulkan_swapchain(vw); // Link Swapchain to Vulkan Instance
+		vulkan::ffi::create_swapchain(connection, vw.surface, vw.device,
+			&mut vw.swapchain, vw.width, vw.height,
+			&mut vw.image_count, vw.color_format.clone(),
+			vw.present_mode.clone(),
+			&mut vw.present_images[0]); // 
+
+//		vw_vulkan_swapchain(vw); // Link Swapchain to Vulkan Instance
 		vw_vulkan_resize(vw);
 	}
 }
@@ -322,37 +326,41 @@ impl Vw {
 		let (gpu, pqi) = unsafe {
 			vulkan::ffi::get_gpu(&connection.0, instance, surface)
 		};
-		let gpu_interface = unsafe {
+		let device = unsafe {
 			vulkan::ffi::create_device(&connection.0, gpu, pqi)
 		};
 		let present_queue = unsafe {
-			vulkan::ffi::create_queue(&connection.0, gpu_interface,
-				pqi)
+			vulkan::ffi::create_queue(&connection.0, device, pqi)
 		};
 		let command_buffer = unsafe {
 			vulkan::ffi::create_command_buffer(&connection.0,
-				gpu_interface, pqi)
+				device, pqi)
 		}.0;
 		let color_format = unsafe {
 			vulkan::ffi::get_color_format(&connection.0,
 				gpu, surface)
 		};
+		let image_count = unsafe {
+			vulkan::ffi::get_buffering(&connection.0, gpu, surface)
+		};
+		let present_mode = unsafe {
+			vulkan::ffi::get_present_mode(&connection.0, gpu,
+				surface)
+		};
 
 		let mut vw = Vw {
 			instance, surface,
 			present_queue_index: pqi,
-			present_queue, gpu,
-			device: gpu_interface,
-			command_buffer,
-			swapchain: 0,
-			width: 0, height: 0,
-			present_images: [0, 0],
+			present_queue, gpu, device, command_buffer,
+			swapchain: unsafe { mem::zeroed() },
+			width: 640, height: 360, // TODO
+			present_images: unsafe { mem::zeroed() },
 			frame_buffers: [0, 0],
 			color_format,
-			image_count: 0,
+			image_count,
 			submit_fence: 0,
 			present_image_views: [0, 0],
-			depth_image: 0,
+			depth_image: unsafe { mem::zeroed() },
 			depth_image_view: 0,
 			depth_image_memory: unsafe { mem::zeroed() },
 			render_pass: 0,
@@ -360,9 +368,10 @@ impl Vw {
 			presenting_complete_sem: 0,
 			rendering_complete_sem: 0,
 			offsets: 0,
+			present_mode
 		};
 
-		swapchain_resize(&mut vw);
+		swapchain_resize(&connection.0, &mut vw);
 
 		(connection.0, vw)
 	}
@@ -446,7 +455,7 @@ impl Renderer {
 			vw_vulkan_swapchain_delete(&mut self.vw);
 		}
 
-		swapchain_resize(&mut self.vw);
+		swapchain_resize(&self.connection, &mut self.vw);
 
 		self.shapes.clear();
 		self.projection = projection(size.1 as f32/size.0 as f32, 90.0);

@@ -8,7 +8,6 @@
 
 use std::ptr;
 
-use window::WindowConnection;
 use ami::*;
 
 pub mod ffi;
@@ -32,29 +31,6 @@ impl ::RenderOps for VulkanRenderer {
 	fn update(&self) -> () {
 	}
 }
-
-/*pub struct Queue { pub native: usize }
-impl Queue {
-	pub fn create(gpu_interface: VkDevice, gpu: VkPhysicalDevice,
-		pqi: u32) -> Queue
-	{
-		Queue {
-			native: create_queue::create_queue(gpu_interface, pqi)
-		}
-	}
-}*/
-
-/*pub struct CommandBuffer { pub native: VkCommandBuffer, pub command_pool: u64 }
-impl CommandBuffer {
-	pub fn create(gpu_interface: VkDevice, gpu: VkPhysicalDevice,
-		pqi: u32) -> CommandBuffer
-	{
-		let cmd_buffer = create_command_buffer::create_command_buffer(
-			gpu_interface, pqi);
-
-		CommandBuffer{ native: cmd_buffer.0,command_pool: cmd_buffer.1 }
-	}
-}*/
 
 // TODO: MAKE SURE WINDOWS DOESNT BREAK WITHOUT THIS
 /* extern {

@@ -13,7 +13,6 @@ use self::types::*;
 use ami::{ Void, NULL };
 use std::mem;
 use std::ffi::CString;
-use std::fmt;
 use std::ptr;
 
 const VERSION: (u32, &'static str) = (4194304, "vulkan 1.0.0");
@@ -52,6 +51,11 @@ pub struct Connection {
 	draw: unsafe extern "system" fn(VkCommandBuffer, u32, u32, u32, u32)
 		-> (),
 	unmap: unsafe extern "system" fn(VkDevice, VkDeviceMemory) -> (),
+	new_swapchain: unsafe extern "system" fn(VkDevice,
+		*const VkSwapchainCreateInfoKHR, *const Void,
+		*mut VkSwapchainKHR) -> VkResult,
+	get_swapcount: unsafe extern "system" fn(VkDevice, VkSwapchainKHR,
+		*mut u32, *mut VkImage) -> VkResult,
 }
 
 pub unsafe fn load(app_name: &str) -> Connection {
@@ -69,29 +73,31 @@ pub unsafe fn load(app_name: &str) -> Connection {
 		mapmem: vk_sym(vk, vksym, b"vkMapMemory\0"),
 		draw: vk_sym(vk, vksym, b"vkCmdDraw\0"),
 		unmap: vk_sym(vk, vksym, b"vkUnmapMemory\0"),
+		new_swapchain: vk_sym(vk, vksym, b"vkCreateSwapchainKHR\0"),
+		get_swapcount: vk_sym(vk, vksym, b"vkGetSwapchainImagesKHR\0"),
 	}
 }
 
 unsafe fn dl_sym<T>(lib: *mut Void, name: &[u8]) -> T {
-	let fnPtr = dlsym(lib, &name[0] as *const _ as *const i8);
+	let fn_ptr = dlsym(lib, &name[0] as *const _ as *const i8);
 
-	mem::transmute_copy::<*mut Void, T>(&fnPtr)
+	mem::transmute_copy::<*mut Void, T>(&fn_ptr)
 }
 
 unsafe fn vk_sym<T>(vk: VkInstance, vksym: unsafe extern "system" fn(
 	VkInstance, *const i8) -> *mut Void, name: &[u8]) -> T
 {
-	let fnPtr = vksym(vk, &name[0] as *const _ as *const i8);
+	let fn_ptr = vksym(vk, &name[0] as *const _ as *const i8);
 
-	mem::transmute_copy::<*mut Void, T>(&fnPtr)
+	mem::transmute_copy::<*mut Void, T>(&fn_ptr)
 }
 
 unsafe fn vkd_sym<T>(device: VkDevice, vkdsym: unsafe extern "system" fn(
 	VkDevice, *const i8) -> *mut Void, name: &[u8]) -> T
 {
-	let fnPtr = vkdsym(device, &name[0] as *const _ as *const i8);
+	let fn_ptr = vkdsym(device, &name[0] as *const _ as *const i8);
 
-	mem::transmute_copy::<*mut Void, T>(&fnPtr)
+	mem::transmute_copy::<*mut Void, T>(&fn_ptr)
 }
 
 unsafe fn sym<T>(connection: &Connection, name: &[u8]) -> T {
@@ -203,20 +209,20 @@ pub unsafe fn get_gpu(connection: &Connection, instance: VkInstance,
 	// Load Function
 	type ListGpus = unsafe extern "system" fn(VkInstance, *mut u32,
 		*mut VkPhysicalDevice) -> VkResult;
-	let listGPUs: ListGpus = sym(connection,
+	let vk_list_gpus: ListGpus = sym(connection,
 		b"vkEnumeratePhysicalDevices\0");
 
 	// Set Data
 	let mut num_gpus = 0;
 
 	// Run Function
-	listGPUs(instance, &mut num_gpus, ptr::null_mut());
+	vk_list_gpus(instance, &mut num_gpus, ptr::null_mut());
 
 	// Set Data
 	let mut gpus = vec![mem::uninitialized(); num_gpus as usize];
 
 	// Run function
-	listGPUs(instance, &mut num_gpus, gpus.as_mut_ptr());
+	vk_list_gpus(instance, &mut num_gpus, gpus.as_mut_ptr());
 
 	// Load functions
 	type GetGpuQueueFamProps = unsafe extern "system" fn(VkPhysicalDevice,
@@ -224,16 +230,16 @@ pub unsafe fn get_gpu(connection: &Connection, instance: VkInstance,
 	type GetGpuSurfaceSupport = unsafe extern "system" fn(VkPhysicalDevice,
 		u32, VkSurfaceKHR, *mut u32) -> VkResult;
 
-	let getProps: GetGpuQueueFamProps = sym(connection,
+	let vk_get_props: GetGpuQueueFamProps = sym(connection,
 		b"vkGetPhysicalDeviceQueueFamilyProperties\0");
-	let getSupport: GetGpuSurfaceSupport = sym(connection,
+	let vk_get_support: GetGpuSurfaceSupport = sym(connection,
 		b"vkGetPhysicalDeviceSurfaceSupportKHR\0");
 
 	// Process Data
 	for i in 0..(num_gpus as usize) {
 		let mut num_queue_families = 0;
 
-		getProps(gpus[i], &mut num_queue_families, ptr::null_mut());
+		vk_get_props(gpus[i], &mut num_queue_families, ptr::null_mut());
 
 		let mut properties = vec![VkQueueFamilyProperties {
 			queue_flags: 0,
@@ -244,14 +250,15 @@ pub unsafe fn get_gpu(connection: &Connection, instance: VkInstance,
 			},
 		}; num_queue_families as usize];
 
-		getProps(gpus[i], &mut num_queue_families,
+		vk_get_props(gpus[i], &mut num_queue_families,
 			properties.as_mut_ptr());
 
 		for j in 0..(num_queue_families as usize) {
 			let k = j as u32;
 			let mut supports_present = 0;
 
-			getSupport(gpus[i], k, surface, &mut supports_present);
+			vk_get_support(gpus[i], k, surface,
+				&mut supports_present);
 
 			if supports_present != 0 &&
 				(properties[j].queue_flags & 0x00000001) != 0
@@ -393,7 +400,7 @@ pub unsafe fn create_command_buffer(connection: &Connection, device: VkDevice,
 
 	// Set Data
 	let mut command_pool = 0;
-	let mut command_buffer = unsafe { mem::uninitialized() };
+	let mut command_buffer = mem::uninitialized();
 
 	let create_info = VkCommandPoolCreateInfo {
 		s_type: VkStructureType::CommandPoolCreateInfo,
@@ -447,11 +454,11 @@ pub unsafe fn unmap_memory(connection: &Connection, device: VkDevice,
 	(connection.unmap)(device, vb_memory);
 }
 
-pub unsafe fn cmd_draw(connection: &Connection, cmdBuf: VkCommandBuffer,
+pub unsafe fn cmd_draw(connection: &Connection, cmd_buf: VkCommandBuffer,
 	nvertices: u32, ninstances: u32, firstvertex: u32, firstinstance: u32)
 	-> ()
 {
-	(connection.draw)(cmdBuf, nvertices, ninstances, firstvertex,
+	(connection.draw)(cmd_buf, nvertices, ninstances, firstvertex,
 		firstinstance);
 }
 
@@ -474,15 +481,126 @@ pub unsafe fn get_color_format(connection: &Connection, gpu: VkPhysicalDevice,
 	get_gpu_surface_formats(gpu, surface, &mut nformats, &mut format);
 
 	// Process data
-	if format.format == VkFormat::UNDEFINED {
-		VkFormat::B8G8R8_UNORM
+	if format.format == VkFormat::Undefined {
+		VkFormat::B8g8r8Unorm
 	} else {
 		format.format
 	}
 }
 
-pub unsafe fn create_swapchain(connection: &Connection) {
-	
+pub unsafe fn get_buffering(connection: &Connection, gpu: VkPhysicalDevice,
+	surface: VkSurfaceKHR) -> u32
+{
+	// Load function
+	type VkSurfaceInfo = extern "system" fn(
+		physicalDevice: VkPhysicalDevice, surface: VkSurfaceKHR,
+		pSurfaceCapabilities: *mut VkSurfaceCapabilitiesKHR)
+		-> VkResult;
+	let vk_surface_info: VkSurfaceInfo = sym(connection,
+		b"vkGetPhysicalDeviceSurfaceCapabilitiesKHR\0");
+
+	// Set Data
+	let mut surface_info = mem::uninitialized();
+
+	// Run Function
+	vk_surface_info(gpu, surface, &mut surface_info);
+
+	// Process data
+	let min = surface_info.min_image_count;
+	let max = surface_info.max_image_count;
+	let image_count;
+
+	if min >= max {
+		// Gotta use at least the minimum.
+		image_count = min;
+	}else{
+		// If double-buffering isn't supported, use single-buffering.
+		if max < 2 {
+			image_count = 1;
+		} else {
+			image_count = 2;
+		}
+	}
+
+	match image_count {
+		1 => println!("< WILLOW: Buffering: Single"),
+		2 => println!("< WILLOW: Buffering: Double"),
+		3 => println!("< WILLOW: Buffering: Triple"),
+		_ => panic!("< WILLOW: Image Count: {}", image_count)
+	}
+
+	image_count
+}
+
+pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
+	surface: VkSurfaceKHR) -> VkPresentModeKHR
+{
+	// Load Function
+	type VkGetPresentModes = extern "system" fn(VkPhysicalDevice,
+		VkSurfaceKHR, *mut u32, *mut VkPresentModeKHR) -> VkResult;
+	let vk_get_present_modes: VkGetPresentModes = sym(connection,
+		b"vkGetPhysicalDeviceSurfacePresentModesKHR\0");
+
+	// Set Data
+	let mut npresentmodes = mem::uninitialized();
+
+	// Run Function
+	vk_get_present_modes(gpu, surface, &mut npresentmodes, ptr::null_mut());
+
+	// Set Data
+	let npresentmodes_usize = npresentmodes as usize;
+	let mut present_modes = vec![mem::uninitialized(); npresentmodes_usize];
+
+	// Run Function
+	vk_get_present_modes(gpu, surface, &mut npresentmodes,
+		present_modes.as_mut_ptr());
+
+	// Process Data
+	for i in 0..npresentmodes_usize {
+		if present_modes[i] == VkPresentModeKHR::Mailbox {
+			return VkPresentModeKHR::Mailbox; // optimal
+		}
+	}
+
+	// Fallback
+	VkPresentModeKHR::Fifo
+}
+
+pub unsafe fn create_swapchain(connection: &Connection, surface: VkSurfaceKHR,
+	device: VkDevice, swapchain: &mut VkSwapchainKHR, width: u32,
+	height: u32, image_count: &mut u32, color_format: VkFormat,
+	present_mode: VkPresentModeKHR, swap_images: *mut VkImage)
+{
+	// Set Data
+	let swapChainCreateInfo = VkSwapchainCreateInfoKHR {
+		s_type: VkStructureType::SwapchainCreateInfo,
+		p_next: ptr::null(),
+		flags: 0,
+		surface: surface,
+		min_image_count: *image_count,
+		image_format: color_format,
+		image_color_space: VkColorSpaceKHR::SrgbNonlinearKhr,
+		image_extent: VkExtent2D { width, height },
+		image_array_layers: 1,
+		image_usage: VkImageUsage::ColorAttachmentBit,
+		image_sharing_mode: VkSharingMode::Exclusive,
+		pre_transform: VkSurfaceTransformFlagBitsKHR::Identity,
+		composite_alpha: VkCompositeAlphaFlagBitsKHR::Opaque,
+		present_mode: present_mode,
+		clipped: 1,
+		old_swapchain: mem::zeroed(), // vulkan->swapchain,
+		queue_family_index_count: 0,
+		p_queue_family_indices: ptr::null(),
+	};
+
+	// Run Functions
+	(connection.new_swapchain)(device, &swapChainCreateInfo, ptr::null(),
+		swapchain);
+
+	(connection.get_swapcount)(device, *swapchain, image_count,
+		ptr::null_mut());
+	(connection.get_swapcount)(device, *swapchain, image_count,
+		swap_images);
 }
 
 pub unsafe fn destroy_instance(connection: &Connection) -> () {
