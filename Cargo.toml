@@ -1,21 +1,37 @@
 [package]
-name = "willow"
+name = "adi_gpu"
 version = "0.1.0"
 authors = ["Jeron Aldaron Lau <jeron.lau@plopgrizzly.tech>"]
-description = """
-        The Willow Graphics A.P.I is a Rust library for rendering graphics.
-"""
-keywords = [ "vulkan", "graphics", "rendering" ]
+
+license = "MIT"
+documentation = "https://docs.rs/adi_gpu/"
+homepage = "https://docs.rs/crate/adi_gpu/"
+repository = "https://github.com/aldarons-tech/adi_gpu"
+readme = "README.md"
+
+keywords = [
+	"vulkan", "graphics", "rendering", "opengl", "gpu"
+]
+
 categories = [
 	"rendering::graphics-api", "hardware-support",
 	"rendering::engine", "rendering", "no-std"
 ]
-license = "MIT"
-documentation = "https://docs.rs/willow/"
-homepage = "https://docs.rs/crate/willow/"
-repository = "https://github.com/aldarons-tech/willow"
-readme = "README.md"
-exclude = [ "examples/*", ".gitignore", "TODO" ]
+
+description = """
+
+Aldaron's Device Interface - Graphical Processing Unit, or adi_gpu for short, is
+a library for interfacing with a gpu.  You can use it to render graphics onto a
+surface.  Combined with awi, you can render to a window ( this is made easy with
+adi_screen ).
+
+"""
+
+exclude = [
+	"examples/*", "build-vulkan-shaders.sh", "CODE_OF_CONDUCT.md",
+	"CONTRIBUTING.md", ".gitignore"
+]
+
 build = "build.rs"
 
 [dependencies]

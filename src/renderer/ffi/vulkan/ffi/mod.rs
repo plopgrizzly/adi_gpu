@@ -75,6 +75,24 @@ pub struct Connection {
 	create_imgview: unsafe extern "system" fn(VkDevice,
 		*const VkImageViewCreateInfo, *const Void, *mut VkImageView)
 		-> VkResult,
+	get_memprops: unsafe extern "system" fn(VkPhysicalDevice,
+		*mut VkPhysicalDeviceMemoryProperties) -> (),
+	create_image: unsafe extern "system" fn(VkDevice,
+		*const VkImageCreateInfo, *const Void, *mut VkImage)
+		-> VkResult,
+	get_imgmemreq: unsafe extern "system" fn(VkDevice, VkImage,
+		*mut VkMemoryRequirements) -> (),
+	mem_allocate: unsafe extern "system" fn(VkDevice,
+		*const VkMemoryAllocateInfo, *const Void, *mut VkDeviceMemory)
+		-> VkResult,
+	bind_imgmem: unsafe extern "system" fn(VkDevice, VkImage,
+		VkDeviceMemory, VkDeviceSize) -> VkResult,
+	new_renderpass: unsafe extern "system" fn(VkDevice,
+		*const VkRenderPassCreateInfo, *const Void, *mut VkRenderPass)
+		-> VkResult,
+	create_framebuffer: unsafe extern "system" fn(VkDevice,
+		*const VkFramebufferCreateInfo, *const Void, *mut VkFramebuffer)
+		-> VkResult,
 }
 
 pub unsafe fn load(app_name: &str) -> Connection {
@@ -103,6 +121,15 @@ pub unsafe fn load(app_name: &str) -> Connection {
 		reset_fence: vk_sym(vk, vksym, b"vkResetFences\0"),
 		reset_cmdbuff: vk_sym(vk, vksym, b"vkResetCommandBuffer\0"),
 		create_imgview: vk_sym(vk, vksym, b"vkCreateImageView\0"),
+		get_memprops: vk_sym(vk, vksym,
+			b"vkGetPhysicalDeviceMemoryProperties\0"),
+		create_image: vk_sym(vk, vksym, b"vkCreateImage\0"),
+		get_imgmemreq: vk_sym(vk, vksym,
+			b"vkGetImageMemoryRequirements\0"),
+		mem_allocate: vk_sym(vk, vksym, b"vkAllocateMemory\0"),
+		bind_imgmem: vk_sym(vk, vksym, b"vkBindImageMemory\0"),
+		new_renderpass: vk_sym(vk, vksym, b"vkCreateRenderPass\0"),
+		create_framebuffer: vk_sym(vk, vksym, b"vkCreateFramebuffer\0"),
 	}
 }
 
@@ -218,15 +245,6 @@ pub unsafe fn get_gpu(connection: &Connection, instance: VkInstance,
 	surface: VkSurfaceKHR) -> (VkPhysicalDevice, u32)
 {
 	#[repr(C)]
-	#[derive(Copy, Clone)]
-	struct VkExtent3D {
-		width: u32,
-		height: u32,
-		depth: u32,
-	}
-
-	#[repr(C)]
-	#[derive(Copy, Clone)]
 	struct VkQueueFamilyProperties {
 		queue_flags: u32,
 		queue_count: u32,
@@ -269,19 +287,18 @@ pub unsafe fn get_gpu(connection: &Connection, instance: VkInstance,
 
 		vk_get_props(gpus[i], &mut num_queue_families, ptr::null_mut());
 
-		let mut properties = vec![VkQueueFamilyProperties {
-			queue_flags: 0,
-			queue_count: 0,
-			timestamp_valid_bits: 0,
-			min_image_transfer_granularity: VkExtent3D {
-				width: 0, height: 0, depth: 0,
-			},
-		}; num_queue_families as usize];
+		let queue_families_size = num_queue_families as usize;
+
+		let mut properties = Vec::with_capacity(queue_families_size);
+
+		for i in 0..queue_families_size {
+			properties.push(mem::uninitialized());
+		}
 
 		vk_get_props(gpus[i], &mut num_queue_families,
 			properties.as_mut_ptr());
 
-		for j in 0..(num_queue_families as usize) {
+		for j in 0..queue_families_size {
 			let k = j as u32;
 			let mut supports_present = 0;
 
@@ -482,6 +499,30 @@ pub unsafe fn unmap_memory(connection: &Connection, device: VkDevice,
 	(connection.unmap)(device, vb_memory);
 }
 
+pub unsafe fn get_memory_type(connection: &Connection, gpu: VkPhysicalDevice,
+	mut type_bits: u32, reqs_mask: VkFlags) -> u32
+{
+	let mut props = mem::uninitialized();
+	// TODO; only needs to happen once
+	(connection.get_memprops)(gpu, &mut props);
+
+	for i in 0..(props.memoryTypeCount as usize) {
+		// Memory type req's matches vkGetImageMemoryRequirements()?
+		if (type_bits & 1) == 1
+			&& (props.memoryTypes[i].propertyFlags & reqs_mask) ==
+				reqs_mask
+		{
+			return i as u32;
+		}
+		// Check next bit from vkGetImageMemoryRequirements().
+		type_bits >>= 1;
+	}
+
+	// Nothing works ... fallback to 0 and hope nothing bad happens.
+	panic!(concat!(env!("CARGO_PKG_NAME"),
+		"Couldn't find suitable memory type."))
+}
+
 pub unsafe fn cmd_draw(connection: &Connection, cmd_buf: VkCommandBuffer,
 	nvertices: u32, ninstances: u32, firstvertex: u32, firstinstance: u32)
 	-> ()
@@ -594,8 +635,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	VkPresentModeKHR::Fifo
 }
 
-#[inline(always)]
-pub(in renderer) unsafe fn create_swapchain(
+#[inline(always)] pub(in renderer) unsafe fn create_swapchain(
 	connection: &Connection, surface: VkSurfaceKHR, device: VkDevice,
 	swapchain: &mut VkSwapchainKHR, width: u32, height: u32,
 	image_count: &mut u32, color_format: VkFormat,
@@ -735,6 +775,269 @@ pub(in renderer) unsafe fn create_swapchain(
 			},
 			ptr::null(),
 			&mut image_views[i]
+		);
+	}
+}
+
+#[inline(always)] pub(in renderer) unsafe fn create_depth_buffer(
+	connection: &Connection, device: VkDevice, gpu: VkPhysicalDevice,
+	command_buffer: VkCommandBuffer, submit_fence: VkFence,
+	present_queue: VkQueue, width: u32, height: u32)
+	-> (VkImage, VkImageView, VkDeviceMemory)
+{
+	let mut image = mem::uninitialized();
+	let mut image_view = mem::uninitialized();
+	let mut image_memory = mem::uninitialized();
+
+	let mut memory_reqs = mem::uninitialized();
+
+	(connection.create_image)(
+		device,
+		&VkImageCreateInfo {
+			s_type: VkStructureType::ImageCreateInfo,
+			p_next: ptr::null(),
+			flags: 0,
+			image_type: VkImageType::Dim2d,
+			format: VkFormat::D16Unorm,
+			extent: VkExtent3D {
+				width: width,
+				height: height,
+				depth: 1,
+			},
+			mip_levels: 1,
+			array_layers: 1,
+			samples: VkSampleCount::Sc1,
+			tiling: VkImageTiling::Optimal,
+			usage: VkImageUsage::DepthStencilAttachmentBit,
+			sharing_mode: VkSharingMode::Exclusive,
+			queue_family_index_count: 0,
+			p_queue_family_indices: ptr::null(),
+			initial_layout: VkImageLayout::Undefined,
+		},
+		ptr::null(),
+		&mut image
+	);
+
+	(connection.get_imgmemreq)(device, image, &mut memory_reqs);
+
+	(connection.mem_allocate)(
+		device,
+		&VkMemoryAllocateInfo {
+			s_type: VkStructureType::MemoryAllocateInfo,
+			p_next: ptr::null(),
+			allocation_size: memory_reqs.size,
+			memory_type_index: get_memory_type(
+				connection,
+				gpu,
+				memory_reqs.memory_type_bits,
+				0
+			),
+		},
+		ptr::null(),
+		&mut image_memory
+	);
+
+	(connection.bind_imgmem)(device, image, image_memory, 0);
+
+	// before using this depth buffer we must change it's layout:
+	(connection.begin_cmdbuff)(
+		command_buffer,
+		&VkCommandBufferBeginInfo {
+			s_type: VkStructureType::CommandBufferBeginInfo,
+			p_next: ptr::null(),
+			flags: VkCommandBufferUsage::OneTimeSubmitBit,
+			p_inheritance_info: ptr::null(),
+		}
+	);
+
+	(connection.pipeline_barrier)(
+		command_buffer, 
+		VkPipelineStage::TopOfPipe, 
+		VkPipelineStage::TopOfPipe,
+		0,
+		0,
+		ptr::null(),
+		0,
+		ptr::null(),
+		1,
+		&VkImageMemoryBarrier {
+			s_type: VkStructureType::ImageMemoryBarrier,
+			p_next: ptr::null(),
+			src_access_mask: VkAccess::NoFlags,
+			dst_access_mask:
+				VkAccess::DepthStencilAttachmentReadWrite,
+			old_layout: VkImageLayout::Undefined,
+			new_layout:
+				VkImageLayout::DepthStencilAttachmentOptimal,
+			src_queue_family_index: !0,
+			dst_queue_family_index: !0,
+			image: image,
+			subresource_range: VkImageSubresourceRange {
+				aspect_mask: VkImageAspectFlags::Depth,
+				base_mip_level: 0,
+				level_count: 1,
+				base_array_layer: 0,
+				layer_count: 1,
+			},
+		}
+	);
+
+	(connection.end_cmdbuff)(command_buffer);
+
+	(connection.queue_submit)(
+		present_queue,
+		1,
+		&VkSubmitInfo {
+			s_type: VkStructureType::SubmitInfo,
+			p_next: ptr::null(),
+			wait_semaphore_count: 0,
+			wait_semaphores: ptr::null(),
+			wait_dst_stage_mask:
+				&VkPipelineStage::ColorAttachmentOutput,
+			command_buffer_count: 1,
+			p_command_buffers: &command_buffer,
+			signal_semaphore_count: 0,
+			p_signal_semaphores: ptr::null(),
+		},
+		submit_fence
+	);
+
+	(connection.wait_fence)(device, 1, &submit_fence, 1, u64::MAX);
+	(connection.reset_fence)(device, 1, &submit_fence);
+	(connection.reset_cmdbuff)(command_buffer, 0);
+
+	// create the depth image view:
+	(connection.create_imgview)(
+		device,
+		&VkImageViewCreateInfo {
+			s_type: VkStructureType::ImageViewCreateInfo,
+			p_next: ptr::null(),
+			flags: 0,
+			image: image,
+			view_type: VkImageViewType::SingleLayer2d,
+			format: VkFormat::D16Unorm,
+			components: VkComponentMapping {
+				r: VkComponentSwizzle::Identity,
+				g: VkComponentSwizzle::Identity,
+				b: VkComponentSwizzle::Identity,
+				a: VkComponentSwizzle::Identity,
+			},
+			subresource_range: VkImageSubresourceRange {
+				aspect_mask: VkImageAspectFlags::Depth,
+				base_mip_level: 0,
+				level_count: 1,
+				base_array_layer: 0,
+				layer_count: 1,
+			},
+		},
+		ptr::null(),
+		&mut image_view
+	);
+
+	(image, image_view, image_memory)
+}
+
+pub unsafe fn create_render_pass(connection: &Connection, device: VkDevice,
+	color_format: &VkFormat) -> VkRenderPass
+{
+	let mut render_pass = mem::uninitialized();
+
+	(connection.new_renderpass)(
+		device,
+		&VkRenderPassCreateInfo {
+			s_type: VkStructureType::RenderPassCreateInfo,
+			p_next: ptr::null(),
+			flags: 0,
+			attachment_count: 2,
+			attachments: [
+				// Color Buffer
+				VkAttachmentDescription {
+					flags: 0,
+					format: color_format.clone(),
+					samples: VkSampleCount::Sc1,
+					load_op: VkAttachmentLoadOp::Clear,
+					store_op: VkAttachmentStoreOp::Store,
+					stencil_load_op:
+						VkAttachmentLoadOp::DontCare,
+					stencil_store_op:
+						VkAttachmentStoreOp::DontCare,
+					initial_layout:
+					  VkImageLayout::ColorAttachmentOptimal,
+					final_layout:
+					  VkImageLayout::ColorAttachmentOptimal,
+				},
+				// Depth Buffer
+				VkAttachmentDescription {
+					flags: 0,
+					format: VkFormat::D16Unorm,
+					samples: VkSampleCount::Sc1,
+					load_op: VkAttachmentLoadOp::Clear,
+					store_op: VkAttachmentStoreOp::DontCare,
+					stencil_load_op:
+						VkAttachmentLoadOp::DontCare,
+					stencil_store_op:
+						VkAttachmentStoreOp::DontCare,
+					initial_layout:
+					 VkImageLayout::DepthStencilAttachmentOptimal,
+					final_layout:
+					 VkImageLayout::DepthStencilAttachmentOptimal,
+				},
+			].as_ptr(),
+			subpass_count: 1,
+			subpasses: &VkSubpassDescription {
+				flags: 0,
+				pipeline_bind_point: VkPipelineBindPoint::Graphics,
+				color_attachment_count: 1,
+				color_attachments: &VkAttachmentReference {
+					attachment: 0,
+					layout:
+					  VkImageLayout::ColorAttachmentOptimal,
+				},
+				depth_stencil_attachment: &VkAttachmentReference
+				{
+					attachment: 1,
+					layout:
+					 VkImageLayout::DepthStencilAttachmentOptimal,
+				},
+				input_attachment_count: 0,
+				input_attachments: ptr::null(),
+				preserve_attachment_count: 0,
+				preserve_attachments: ptr::null(),
+				resolve_attachments: ptr::null(),
+			},
+			dependency_count: 0,
+			dependencies: ptr::null(),
+		},
+		ptr::null(),
+		&mut render_pass
+	);
+
+	render_pass
+}
+
+pub unsafe fn create_framebuffers(connection: &Connection, device: VkDevice,
+	image_count: u32, render_pass: VkRenderPass,
+	present_imgviews: &[VkImageView], depth_imgview: VkImageView,
+	width: u32, height: u32, fbs: &mut[VkFramebuffer])
+{
+	// create a framebuffer per swap chain imageView:
+	for i in 0..(image_count as usize) {
+		(connection.create_framebuffer)(
+			device,
+			&VkFramebufferCreateInfo {
+				s_type: VkStructureType::FramebufferCreateInfo,
+				p_next: ptr::null(),
+				flags: 0,
+				attachment_count: 2,
+				attachments: [
+					present_imgviews[i],
+					depth_imgview,
+				].as_ptr(),
+				layers: 1,
+				render_pass, width, height,
+			},
+			ptr::null(),
+			&mut fbs[i]
 		);
 	}
 }

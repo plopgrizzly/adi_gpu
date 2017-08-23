@@ -17,19 +17,6 @@ use self::ffi::vulkan;
 
 mod ffi;
 
-type VkFramebuffer = u64;
-type VkDescriptorPool = u64;
-type VkDescriptorSetLayout = u64;
-type VkDescriptorSet = u64;
-type VkRenderPass = u64;
-type VkPipelineLayout = u64;
-type VkSemaphore = u64;
-type VkShaderModule = u64;
-type VkSampler = u64;
-type VkPipeline = u64;
-
-type VkC = u32; // Size of enum is 4 bytes
-
 use self::ffi::vulkan::ffi::types::*;
 use self::ffi::vulkan::ffi::Connection;
 
@@ -76,9 +63,13 @@ impl Shader {
 		textures: u32) -> Shader
 	{
 		// TODO: has_data
-		let mut shader = Shader { vertex: 0, fragment: 0,
-			textures, has_data: 0 };
-		unsafe {
+		let mut shader = Shader {
+			vertex: unsafe { mem::uninitialized() },
+			fragment: unsafe { mem::uninitialized() },
+			textures, has_data: 0
+		};
+
+		unsafe {		
 			vw_vulkan_shader(&mut shader, vw, &vert[0],
 				vert.len() as u32, &frag[0], frag.len() as u32);
 		}
@@ -269,14 +260,7 @@ extern {
 	fn vw_vulkan_swapchain_delete(v: *mut Vw) -> ();
 }
 
-// TODO: Replaces vw_vulkan_resize
 fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
-	extern "C" {
-		fn vw_vulkan_depth_buffer(v: *mut Vw) -> ();
-		fn vw_vulkan_render_pass(v: *mut Vw) -> ();
-		fn vw_vulkan_framebuffers(v: *mut Vw) -> ();
-	}
-
 	unsafe {
 		// Link swapchain to vulkan instance.
 		vulkan::ffi::create_swapchain(
@@ -284,7 +268,8 @@ fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 			vw.surface,
 			vw.device,
 			&mut vw.swapchain,
-			vw.width, vw.height,
+			vw.width,
+			vw.height,
 			&mut vw.image_count,
 			vw.color_format.clone(),
 			vw.present_mode.clone(),
@@ -304,13 +289,40 @@ fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 		);
 
 		// Link Depth Buffer to swapchain
-		vw_vulkan_depth_buffer(vw);
+		let (img, view, mem) = vulkan::ffi::create_depth_buffer(
+			connection,
+			vw.device,
+			vw.gpu,
+			vw.command_buffer,
+			vw.submit_fence,
+			vw.present_queue,
+			vw.width,
+			vw.height,
+		);
+
+		vw.depth_image = img;
+		vw.depth_image_view = view;
+		vw.depth_image_memory = mem;
 
 		// Link Render Pass to swapchain
-		vw_vulkan_render_pass(vw);
+		vw.render_pass = vulkan::ffi::create_render_pass(
+			connection,
+			vw.device,
+			&vw.color_format,
+		);
 
 		// Link Framebuffers to swapchain
-		vw_vulkan_framebuffers(vw);
+		vulkan::ffi::create_framebuffers(
+			connection,
+			vw.device,
+			vw.image_count,
+			vw.render_pass,
+			&vw.present_image_views,
+			vw.depth_image_view,
+			vw.width,
+			vw.height,
+			&mut vw.frame_buffers,
+		);
 	}
 }
 
@@ -376,7 +388,7 @@ impl Vw {
 			swapchain: unsafe { mem::zeroed() },
 			width: 640, height: 360, // TODO
 			present_images: unsafe { mem::zeroed() },
-			frame_buffers: [0, 0],
+			frame_buffers: unsafe { mem::uninitialized() },
 			color_format,
 			image_count,
 			submit_fence: unsafe { mem::zeroed() },
@@ -384,10 +396,10 @@ impl Vw {
 			depth_image: unsafe { mem::zeroed() },
 			depth_image_view: unsafe { mem::zeroed() },
 			depth_image_memory: unsafe { mem::zeroed() },
-			render_pass: 0,
+			render_pass: unsafe { mem::uninitialized() },
 			next_image_index: 0,
-			presenting_complete_sem: 0,
-			rendering_complete_sem: 0,
+			presenting_complete_sem: unsafe { mem::uninitialized() },
+			rendering_complete_sem: unsafe { mem::uninitialized() },
 			offsets: 0,
 			present_mode
 		};
@@ -431,8 +443,14 @@ impl Renderer {
 			Shader::create(&vw, include_bytes!("../native_renderer/vulkan/res/solid-vert.spv"),
 				include_bytes!("../native_renderer/vulkan/res/solid-frag.spv"), 0)
 		];
-		let mut styles = vec![Style { pipeline: 0, descsetlayout: 0,
-			pipeline_layout: 0 }; shadev.len()];
+		let mut styles = vec![
+			Style {
+				pipeline: unsafe { mem::uninitialized() },
+				descsetlayout: unsafe { mem::uninitialized() },
+				pipeline_layout: unsafe { mem::uninitialized() }
+			};
+			shadev.len()
+		];
 
 		unsafe {
 			vw_vulkan_pipeline(&mut styles[0], &mut vw, &shadev[0],

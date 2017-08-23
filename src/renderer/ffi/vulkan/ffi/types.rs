@@ -24,6 +24,13 @@ pub type VkBool32 = u32;
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkSemaphore(u64);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkImageView(u64);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkBuffer(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkShaderModule(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkPipeline(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkDescriptorSetLayout(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkPipelineLayout(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkSampler(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkDescriptorSet(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkDescriptorPool(u64);
 
 // Dispatchable Handles
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkDevice(*mut Void);
@@ -31,6 +38,109 @@ pub type VkBool32 = u32;
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkInstance(*mut Void);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkCommandBuffer(*mut Void);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkQueue(*mut Void);
+
+#[repr(C)] pub struct VkFramebufferCreateInfo {
+	pub s_type: VkStructureType,
+	pub p_next: *const Void,
+	pub flags: VkFlags,
+	pub render_pass: VkRenderPass,
+	pub attachment_count: u32,
+	pub attachments: *const VkImageView,
+	pub width: u32,
+	pub height: u32,
+	pub layers: u32,
+}
+
+#[repr(C)] pub struct VkRenderPassCreateInfo {
+	pub s_type: VkStructureType,
+	pub p_next: *const Void,
+	pub flags: VkFlags,
+	pub attachment_count: u32,
+	pub attachments: *const VkAttachmentDescription,
+	pub subpass_count: u32,
+	pub subpasses: *const VkSubpassDescription,
+	pub dependency_count: u32,
+	pub dependencies: *const Void,
+}
+
+#[repr(C)] pub struct VkSubpassDescription {
+	pub flags: VkFlags,
+	pub pipeline_bind_point: VkPipelineBindPoint,
+	pub input_attachment_count: u32,
+	pub input_attachments: *const VkAttachmentReference,
+	pub color_attachment_count: u32,
+	pub color_attachments: *const VkAttachmentReference,
+	pub resolve_attachments: *const VkAttachmentReference,
+	pub depth_stencil_attachment: *const VkAttachmentReference,
+	pub preserve_attachment_count: u32,
+	pub preserve_attachments: *const u32,
+}
+
+#[repr(C)] pub struct VkAttachmentReference {
+	pub attachment: u32,
+	pub layout: VkImageLayout,
+}
+
+#[repr(C)] pub struct VkAttachmentDescription {
+	pub flags: VkFlags,
+	pub format: VkFormat,
+	pub samples: VkSampleCount,
+	pub load_op: VkAttachmentLoadOp,
+	pub store_op: VkAttachmentStoreOp,
+	pub stencil_load_op: VkAttachmentLoadOp,
+	pub stencil_store_op: VkAttachmentStoreOp,
+	pub initial_layout: VkImageLayout,
+	pub final_layout: VkImageLayout,
+}
+
+#[repr(C)] pub struct VkMemoryRequirements {
+	pub size: VkDeviceSize,
+	pub alignment: VkDeviceSize,
+	pub memory_type_bits: u32,
+}
+
+#[repr(C)] pub struct VkMemoryAllocateInfo {
+	pub s_type: VkStructureType,
+	pub p_next: *const Void,
+	pub allocation_size: VkDeviceSize,
+	pub memory_type_index: u32,
+}
+
+#[repr(C)] pub struct VkExtent3D {
+	pub width: u32,
+	pub height: u32,
+	pub depth: u32,
+}
+
+#[repr(C)] pub struct VkImageCreateInfo {
+	pub s_type: VkStructureType,
+	pub p_next: *const Void,
+	pub flags: VkFlags,
+	pub image_type: VkImageType,
+	pub format: VkFormat,
+	pub extent: VkExtent3D,
+	pub mip_levels: u32,
+	pub array_layers: u32,
+	pub samples: VkSampleCount,
+	pub tiling: VkImageTiling,
+	pub usage: VkImageUsage,
+	pub sharing_mode: VkSharingMode,
+	pub queue_family_index_count: u32,
+	pub p_queue_family_indices: *const u32,
+	pub initial_layout: VkImageLayout,
+}
+
+#[repr(C)] pub struct VkMemoryType {
+	pub propertyFlags: VkFlags,
+	pub heapIndex: u32,
+}
+
+#[repr(C)] pub struct VkPhysicalDeviceMemoryProperties {
+	pub memoryTypeCount: u32,
+	pub memoryTypes: [VkMemoryType; 32],
+	pub memoryHeapCount: u32,
+	pub memoryHeaps: [VkMemoryType; 32],
+}
 
 #[repr(C)] pub struct VkImageMemoryBarrier {
 	pub s_type: VkStructureType,
@@ -191,6 +301,43 @@ pub type VkBool32 = u32;
 	pub pp_enabled_extension_names: *const *const i8,
 }
 
+#[repr(C)] #[allow(dead_code)] pub enum VkPipelineBindPoint {
+	Graphics = 0,
+	Compute = 1,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkAttachmentStoreOp {
+	Store = 0,
+	DontCare = 1,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkAttachmentLoadOp {
+	Load = 0,
+	Clear = 1,
+	DontCare = 2,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkImageTiling {
+	Optimal = 0,
+	Linear = 1,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkSampleCount {
+	Sc1 = 0x00000001,
+	Sc2 = 0x00000002,
+	Sc4 = 0x00000004,
+	Sc8 = 0x00000008,
+	Sc16 = 0x00000010,
+	Sc32 = 0x00000020,
+	Sc64 = 0x00000040,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkImageType {
+	Dim1d = 0,
+	Dim2d = 1,
+	Dim3d = 2,
+}
+
 #[repr(C)] #[allow(dead_code)] pub enum VkAccess {
 	NoFlags = 0x00000000,
 	IndirectCommandReadBit = 0x00000001,
@@ -210,6 +357,8 @@ pub type VkBool32 = u32;
 	HostWriteBit = 0x00004000,
 	MemoryReadBit = 0x00008000,
 	MemoryWriteBit = 0x00010000,
+	// OR'D FLAGS
+	DepthStencilAttachmentReadWrite = 0x00000200 | 0x00000400,
 }
 
 #[repr(C)] #[allow(dead_code)] pub enum VkImageLayout {
@@ -528,6 +677,7 @@ pub enum VkPresentModeKHR {
 	PipelineLayoutCreateInfo = 30,
 	SamplerCreateInfo = 31,
 	DescriptorSetLayoutCreateInfo = 32,
+	FramebufferCreateInfo = 37,
 	RenderPassCreateInfo = 38,
 	CommandPoolCreateInfo = 39,
 	CommandBufferAllocateInfo = 40,

@@ -4,11 +4,11 @@ version = "0.1.0"
 authors = ["Jeron Aldaron Lau <jeron.lau@plopgrizzly.tech>"]
 
 [dependencies]
-willow = { path = "../../" }
+adi_gpu = { path = "../../" }
 aci_png = "^0.2"
 
 # Enable checks & validation
 [features]
 default = []
-checks = ["willow/checks"]
-validation = ["willow/validation"]
+checks = ["adi_gpu/checks"]
+validation = ["adi_gpu/validation"]
