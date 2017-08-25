@@ -41,7 +41,7 @@ static uint32_t memory_type_from_properties(const vw_t* vulkan, uint32_t typeBit
 	return 0;
 }
 
-// Called From Rust FFI
+// TODO: REMOVE
 void vw_vulkan_txuniform(const vw_t* vulkan, vw_instance_t* instance,
 	const vw_texture_t* tx, uint8_t tex_count)
 {
@@ -83,87 +83,6 @@ void vw_vulkan_txuniform(const vw_t* vulkan, vw_instance_t* instance,
 	}
 
 	vkUpdateDescriptorSets(vulkan->device, 1 + NUM_WRITES, writes, 0, NULL);
-}
-
-void vw_uniform_uniforms_free(const vw_t* vulkan, vw_instance_t* instance) {
-	vkFreeMemory(vulkan->device, instance->uniform_memory, NULL);
-	vkFreeDescriptorSets(vulkan->device, instance->desc_pool, 1, &instance->desc_set);
-	vkDestroyDescriptorPool(vulkan->device, instance->desc_pool, NULL);
-	vkDestroyBuffer(vulkan->device, instance->matrix_buffer, NULL);
-}
-
-/// RUST FFI: New instance with uninit'd uniform data.
-vw_instance_t vw_instance_new(const vw_t* vulkan, vw_pipeline_t pipeline,
-	int numFloats)
-{
-	vw_instance_t instance;
-
-	// Buffers
-	const VkBufferCreateInfo uniform_buffer_ci = {
-		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size = sizeof(float) * numFloats,
-		.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-		.queueFamilyIndexCount = 0,
-		.pQueueFamilyIndices = NULL,
-	};
-	vw_vulkan_error("Failed to create matrix buffer.", vkCreateBuffer(
-		vulkan->device, &uniform_buffer_ci, NULL,
-		&instance.matrix_buffer));
-
-	// Descriptor Pool
-	const VkDescriptorPoolSize type_counts = {
-		 .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		 .descriptorCount = 1,
-	};
-	const VkDescriptorPoolCreateInfo descriptor_pool = {
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		.pNext = NULL,
-		.maxSets = 1,
-		.poolSizeCount = 1,
-		.pPoolSizes = &type_counts,
-	};
-	vw_vulkan_error("Failed to create descriptor pool.",
-		vkCreateDescriptorPool(vulkan->device, &descriptor_pool, NULL,
-			&instance.desc_pool));
-
-	VkDescriptorSetAllocateInfo alloc_info = {
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-		.pNext = NULL,
-		.descriptorPool = instance.desc_pool,
-		.descriptorSetCount = 1,
-		.pSetLayouts = &pipeline.descsetlayout
-	};
-	vw_vulkan_error("Failed to allocate descriptor sets.",
-		vkAllocateDescriptorSets(vulkan->device, &alloc_info,
-			&instance.desc_set));
-
-// {
-	instance.uniform_memory = 0;
-
-	// Allocate memory for uniform buffer.
-	VkMemoryRequirements mem_reqs;
-	vkGetBufferMemoryRequirements(vulkan->device, instance.matrix_buffer,
-		&mem_reqs);
-	VkMemoryAllocateInfo buffer_ai = {
-		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.pNext = NULL,
-		.allocationSize = mem_reqs.size,
-		.memoryTypeIndex = memory_type_from_properties(vulkan,
-			mem_reqs.memoryTypeBits,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
-	};
-
-	vw_vulkan_error("Failed to allocate uniform memory.", vkAllocateMemory(
-		vulkan->device, &buffer_ai, NULL, &instance.uniform_memory));
-	vkBindBufferMemory(vulkan->device, instance.matrix_buffer,
-		instance.uniform_memory, 0);
-// }
-	vw_vulkan_txuniform(vulkan, &instance, NULL, 0);
-
-	instance.pipeline = pipeline;
-	return instance;
 }
 
 // Called From Rust FFI
@@ -730,27 +649,6 @@ void vw_vulkan_pipeline(vw_pipeline_t* pipeline, vw_t* vulkan, vw_shader_t* shad
 
 	vkDestroyShaderModule(vulkan->device, shaders[0].vertex, NULL);
 	vkDestroyShaderModule(vulkan->device, shaders[0].fragment, NULL);
-}
-
-void vw_vulkan_swapchain_delete(vw_t* vulkan) {
-	// Free framebuffers & image view #1
-	for (unsigned int i = 0; i < vulkan->image_count; i++) {
-		vkDestroyFramebuffer(vulkan->device, vulkan->frame_buffers[i],
-			NULL);
-		vkDestroyImageView(vulkan->device,
-			vulkan->present_image_views[i], NULL);
-//		vkDestroyImage(vulkan->device, vulkan->present_images[i], NULL);
-	}
-	// Free render pass
-	vkDestroyRenderPass(vulkan->device, vulkan->render_pass, NULL);
-	// Free depth buffer
-	vkDestroyImageView(vulkan->device, vulkan->depth_image_view, NULL);
-	vkDestroyImage(vulkan->device, vulkan->depth_image, NULL);
-	vkFreeMemory(vulkan->device, vulkan->depth_image_memory, NULL);
-	// Free image view #2
-//	vkDestroyFence(vulkan->device, vulkan->submit_fence, NULL);  // TODO: Mem Error
-	// Free swapchain
-	vkDestroySwapchainKHR(vulkan->device, vulkan->swapchain, NULL);
 }
 
 void vw_vulkan_draw_begin(vw_t* vulkan, float r, float g, float b) {

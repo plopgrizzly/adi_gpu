@@ -161,14 +161,13 @@ pub struct Shape {
 
 		// Free old Style, and set new uniform buffers.
 		unsafe {
-			vw_uniform_uniforms_free(&window.vw, &mut
+			vulkan::ffi::destroy_uniforms(&window.vw, &mut
 				window.sprites[index].instances[i].instance);
 			window.sprites[index].instances[i].instance =
 				vw_vulkan_uniforms(&window.vw, style, texture,
 					if hastx { 1 } else { 0 });
 		}
 		// TODO: Optimize when using same value from vw_vulkan_uniforms
-		// ( Same todo as in extern )
 		// Set texture
 //		unsafe {
 //			vw_vulkan_txuniform(&window.vw,
@@ -229,8 +228,8 @@ pub struct Shape {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct VwInstance {
-	matrix_buffer: VkBuffer,
-	uniform_memory: VkDeviceMemory,
+	pub matrix_buffer: VkBuffer,
+	pub uniform_memory: VkDeviceMemory,
 	pub desc_set: VkDescriptorSet,
 	pub desc_pool: VkDescriptorPool,
 	pub pipeline: Style,
@@ -245,12 +244,6 @@ extern {
 	fn vw_vulkan_pipeline(z: *mut Style, a: *mut Vw, b: *const Shader,
 		c: u32);
 	fn vw_vulkan_draw_begin(v: *mut Vw, r: f32, g: f32, b: f32) -> ();
-	fn vw_uniform_uniforms_free(v: *const Vw, b: *mut VwInstance) -> ();
-// TODO: Use for optimization instead of freeing and reallocating uniform
-// buffers when pipeline doesn't change.
-//	fn vw_vulkan_txuniform(vw: *const Vw, b: *mut VwInstance,
-//		c: *const NativeTexture, d: u8) -> ();
-	fn vw_instance_new(a: *const Vw, b: Style, floats: i32) -> VwInstance;
 	fn vw_vulkan_uniforms(a: *const Vw, b: Style,
 		c: *const NativeTexture, d: u8) -> VwInstance;
 	fn vw_vulkan_draw_shape(v: *mut Vw, s: *const VwShape, f: VwInstance)
@@ -326,6 +319,23 @@ fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 	}
 }
 
+fn swapchain_delete(connection: &Connection, vw: &mut Vw) {
+	unsafe {
+		vulkan::ffi::destroy_swapchain(
+			connection,
+			vw.device,
+			&vw.frame_buffers,
+			&vw.present_image_views,
+			vw.depth_image_view,
+			vw.render_pass,
+			vw.image_count,
+			vw.depth_image,
+			vw.swapchain,
+			vw.depth_image_memory,
+		);
+	}
+}
+
 /*pub fn make_styles(vw: &mut Vw, extrashaders: &[Shader], shaders: &mut Vec<Style>)
 {
 	let mut shadev = Vec::new();
@@ -343,10 +353,6 @@ fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 			shadev.len() as u32);
 	}
 }*/
-
-pub fn close(renderer: &mut Vw) {
-	unsafe { vw_vulkan_swapchain_delete(renderer); }
-}
 
 impl Vw {
 	pub fn new(window_name: &str, window_connection: WindowConnection) -> (Connection, Vw) {
@@ -490,10 +496,7 @@ impl Renderer {
 		self.vw.width = size.0;
 		self.vw.height = size.1;
 
-		unsafe {
-			vw_vulkan_swapchain_delete(&mut self.vw);
-		}
-
+		swapchain_delete(&self.connection, &mut self.vw);
 		swapchain_resize(&self.connection, &mut self.vw);
 
 		self.shapes.clear();
@@ -518,7 +521,16 @@ impl Renderer {
 
 		// Add an instance
 		let instance = unsafe {
-			vw_instance_new(&self.vw, self.style_solid, 4)
+			vulkan::ffi::vw_instance_new(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				self.style_solid,
+				4,
+				unsafe { mem::zeroed() },
+				unsafe { mem::zeroed() },
+				0, // no texure
+			)
 		};
 
 		let matrix = [ color.0, color.1, color.2, color.3 ];

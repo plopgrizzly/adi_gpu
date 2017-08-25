@@ -39,6 +39,64 @@ pub type VkBool32 = u32;
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkCommandBuffer(*mut Void);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkQueue(*mut Void);
 
+#[repr(C)] pub struct VkDescriptorPoolCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub max_sets: u32,
+	pub pool_size_count: u32,
+	pub pool_sizes: *const VkDescriptorPoolSize
+}
+
+#[repr(C)] pub struct VkDescriptorPoolSize {
+	pub descriptor_type: VkDescriptorType,
+	pub descriptor_count: u32,
+}
+
+#[repr(C)] pub struct VkDescriptorSetAllocateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub descriptor_pool: VkDescriptorPool,
+	pub descriptor_set_count: u32,
+	pub set_layouts: *const VkDescriptorSetLayout,
+}
+
+#[repr(C)] pub struct VkBufferCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub size: VkDeviceSize,
+	pub usage: VkBufferUsage,
+	pub sharing_mode: VkSharingMode,
+	pub queue_family_index_count: u32,
+	pub queue_family_indices: *const u32,
+}
+
+#[repr(C)] pub struct VkDescriptorBufferInfo {
+	pub buffer: VkBuffer,
+	pub offset: VkDeviceSize,
+	pub range: VkDeviceSize,
+}
+
+#[repr(C)] pub struct VkWriteDescriptorSet {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub dst_set: VkDescriptorSet,
+	pub dst_binding: u32,
+	pub dst_array_element: u32,
+	pub descriptor_count: u32,
+	pub descriptor_type: VkDescriptorType,
+	pub image_info: *const VkDescriptorImageInfo,
+	pub buffer_info: *const VkDescriptorBufferInfo,
+	pub texel_buffer_view: *const Void,
+}
+
+#[repr(C)] pub struct VkDescriptorImageInfo {
+	pub sampler: VkSampler,
+	pub image_view: VkImageView,
+	pub image_layout: VkImageLayout,
+}
+
 #[repr(C)] pub struct VkFramebufferCreateInfo {
 	pub s_type: VkStructureType,
 	pub p_next: *const Void,
@@ -101,7 +159,7 @@ pub type VkBool32 = u32;
 
 #[repr(C)] pub struct VkMemoryAllocateInfo {
 	pub s_type: VkStructureType,
-	pub p_next: *const Void,
+	pub next: *const Void,
 	pub allocation_size: VkDeviceSize,
 	pub memory_type_index: u32,
 }
@@ -131,15 +189,15 @@ pub type VkBool32 = u32;
 }
 
 #[repr(C)] pub struct VkMemoryType {
-	pub propertyFlags: VkFlags,
-	pub heapIndex: u32,
+	pub property_flags: VkFlags,
+	pub heap_index: u32,
 }
 
 #[repr(C)] pub struct VkPhysicalDeviceMemoryProperties {
-	pub memoryTypeCount: u32,
-	pub memoryTypes: [VkMemoryType; 32],
-	pub memoryHeapCount: u32,
-	pub memoryHeaps: [VkMemoryType; 32],
+	pub memory_type_count: u32,
+	pub memory_types: [VkMemoryType; 32],
+	pub memory_heap_count: u32,
+	pub memory_heaps: [VkMemoryType; 32],
 }
 
 #[repr(C)] pub struct VkImageMemoryBarrier {
@@ -300,6 +358,32 @@ pub type VkBool32 = u32;
 	pub enabled_extension_count: u32,
 	pub pp_enabled_extension_names: *const *const i8,
 }
+
+#[repr(C)] #[allow(dead_code)] pub enum VkBufferUsage {
+	TransferSrcBit = 0x00000001,
+	TransferDstBit = 0x00000002,
+	UniformTexelBufferBit = 0x00000004,
+	StorageTexelBufferBit = 0x00000008,
+	UniformBufferBit = 0x00000010,
+	StorageBufferBit = 0x00000020,
+	IndexBufferBit = 0x00000040,
+	VertexBufferBit = 0x00000080,
+	IndirectBufferBit = 0x00000100,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkDescriptorType {
+	Sampler = 0,
+	CombinedImageSampler = 1,
+	SampledImage = 2,
+	StorageImage = 3,
+	UniformTexelBuffer = 4,
+	StorageTexelBuffer = 5,
+	UniformBuffer = 6,
+	StorageBuffer = 7,
+	UniformBufferDynamic = 8,
+	StorageBufferDynamic = 9,
+	InputAttachment = 10,
+} 
 
 #[repr(C)] #[allow(dead_code)] pub enum VkPipelineBindPoint {
 	Graphics = 0,
@@ -669,20 +753,48 @@ pub enum VkPresentModeKHR {
 	DeviceCreateInfo = 3,
 	SubmitInfo = 4,
 	MemoryAllocateInfo = 5,
+	MappedMemoryRange = 6,
+	BindSparseInfo = 7,
 	FenceCreateInfo = 8,
+	SemaphoreCreateInfo = 9,
+	EventCreateInfo = 10,
+	QueryPoolCreateInfo = 11,
 	BufferCreateInfo = 12,
+	BufferViewCreateInfo = 13,
 	ImageCreateInfo = 14,
 	ImageViewCreateInfo = 15,
+	ShaderModuleCreateInfo = 16,
 	PipelineCacheCreateInfo = 17,
+	PipelineShaderStageCreateInfo = 18,
+	PipelineVertexInputStateCreateInfo = 19,
+	PipelineInputAssemlyStateCreateInfo = 20,
+	PipelineTessellationStateCreateInfo = 21,
+	PipelineViewportStateCreateInfo = 22,
+	PipelineRasterizationStateCreateInfo = 23,
+	PipelineMultisampleStateCreateInfo = 24,
+	PipelineDepthStencilStateCreateInfo = 25,
+	PipelineColorBlendStateCreateInfo = 26,
+	PipelineDynamicStateCreateInfo = 27,
+	GraphicsPipelineCreateInfo = 28,
+	ComputePipelineCreateInfo = 29,
 	PipelineLayoutCreateInfo = 30,
 	SamplerCreateInfo = 31,
 	DescriptorSetLayoutCreateInfo = 32,
+	DescriptorPoolCreateInfo = 33,
+	DescriptorSetAllocateInfo = 34,
+	WriteDescriptorSet = 35,
 	FramebufferCreateInfo = 37,
 	RenderPassCreateInfo = 38,
 	CommandPoolCreateInfo = 39,
 	CommandBufferAllocateInfo = 40,
+	CommandBufferInheritanceInfo = 41,
 	CommandBufferBeginInfo = 42,
+	RenderPassBeginInfo = 43,
+	BufferMemoryBarrier = 44,
 	ImageMemoryBarrier = 45,
+	MemoryBarrier = 46,
+	LoaderInstanceCreateInfo = 47,
+	LoaderDeviceCreateInfo = 48,
 	SwapchainCreateInfo = 1000001000,
 	#[cfg(unix)]
 	SurfaceCreateInfo = 1000005000, // XCB

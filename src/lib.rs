@@ -77,6 +77,7 @@ pub struct Transform(pub [f32; 16]);
 
 mod renderer;
 mod render_ops;
+mod ali_vulkan;
 
 pub mod input {
 	pub use window::InputQueue as Queue;

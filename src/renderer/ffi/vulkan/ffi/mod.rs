@@ -93,6 +93,39 @@ pub struct Connection {
 	create_framebuffer: unsafe extern "system" fn(VkDevice,
 		*const VkFramebufferCreateInfo, *const Void, *mut VkFramebuffer)
 		-> VkResult,
+	drop_framebuffer: unsafe extern "system" fn(VkDevice, VkFramebuffer,
+		*const Void) -> (),
+	drop_imgview: unsafe extern "system" fn(VkDevice, VkImageView,
+		*const Void) -> (),
+	drop_renderpass: unsafe extern "system" fn(VkDevice, VkRenderPass,
+		*const Void) -> (),
+	drop_image: unsafe extern "system" fn(VkDevice, VkImage, *const Void)
+		-> (),
+	drop_memory: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
+		*const Void) -> (),
+	drop_swapchain: unsafe extern "system" fn(VkDevice, VkSwapchainKHR,
+		*const Void) -> (),
+	update_descsets: unsafe extern "system" fn(VkDevice, u32,
+		*const VkWriteDescriptorSet, u32, *const Void) -> (),
+	drop_descsets: unsafe extern "system" fn(VkDevice, VkDescriptorPool,
+		u32, *const VkDescriptorSet) -> VkResult,
+	drop_descpool: unsafe extern "system" fn(VkDevice, VkDescriptorPool,
+		*const Void) -> (),
+	drop_buffer: unsafe extern "system" fn(VkDevice, VkBuffer, *const Void)
+		-> (),
+	bind_buffer_mem: unsafe extern "system" fn(VkDevice, VkBuffer,
+		VkDeviceMemory, VkDeviceSize) -> VkResult,
+	get_bufmemreq: unsafe extern "system" fn(VkDevice, VkBuffer,
+		*mut VkMemoryRequirements) -> (),
+	new_buffer: unsafe extern "system" fn(VkDevice,
+		*const VkBufferCreateInfo, *const Void, *mut VkBuffer)
+		-> VkResult,
+	new_descpool: unsafe extern "system" fn(VkDevice,
+		*const VkDescriptorPoolCreateInfo, *const Void,
+		*mut VkDescriptorPool) -> VkResult,
+	new_descsets: unsafe extern "system" fn(VkDevice,
+		*const VkDescriptorSetAllocateInfo, *mut VkDescriptorSet)
+		-> VkResult,
 }
 
 pub unsafe fn load(app_name: &str) -> Connection {
@@ -130,6 +163,22 @@ pub unsafe fn load(app_name: &str) -> Connection {
 		bind_imgmem: vk_sym(vk, vksym, b"vkBindImageMemory\0"),
 		new_renderpass: vk_sym(vk, vksym, b"vkCreateRenderPass\0"),
 		create_framebuffer: vk_sym(vk, vksym, b"vkCreateFramebuffer\0"),
+		drop_framebuffer: vk_sym(vk, vksym, b"vkDestroyFramebuffer\0"),
+		drop_imgview: vk_sym(vk, vksym, b"vkDestroyImageView\0"),
+		drop_renderpass: vk_sym(vk, vksym, b"vkDestroyRenderPass\0"),
+		drop_memory: vk_sym(vk, vksym, b"vkFreeMemory\0"),
+		drop_image: vk_sym(vk, vksym, b"vkDestroyImage\0"),
+		drop_swapchain: vk_sym(vk, vksym, b"vkDestroySwapchainKHR\0"),
+		update_descsets: vk_sym(vk, vksym, b"vkUpdateDescriptorSets\0"),
+		drop_descsets: vk_sym(vk, vksym, b"vkFreeDescriptorSets\0"),
+		drop_descpool: vk_sym(vk, vksym, b"vkDestroyDescriptorPool\0"),
+		drop_buffer: vk_sym(vk, vksym, b"vkDestroyBuffer\0"),
+		bind_buffer_mem: vk_sym(vk, vksym, b"vkBindBufferMemory\0"),
+		get_bufmemreq: vk_sym(vk, vksym,
+			b"vkGetBufferMemoryRequirements\0"),
+		new_buffer: vk_sym(vk, vksym, b"vkCreateBuffer\0"),
+		new_descpool: vk_sym(vk, vksym, b"vkCreateDescriptorPool\0"),
+		new_descsets: vk_sym(vk, vksym, b"vkAllocateDescriptorSets\0"),
 	}
 }
 
@@ -291,9 +340,7 @@ pub unsafe fn get_gpu(connection: &Connection, instance: VkInstance,
 
 		let mut properties = Vec::with_capacity(queue_families_size);
 
-		for i in 0..queue_families_size {
-			properties.push(mem::uninitialized());
-		}
+		properties.set_len(queue_families_size);
 
 		vk_get_props(gpus[i], &mut num_queue_families,
 			properties.as_mut_ptr());
@@ -506,10 +553,10 @@ pub unsafe fn get_memory_type(connection: &Connection, gpu: VkPhysicalDevice,
 	// TODO; only needs to happen once
 	(connection.get_memprops)(gpu, &mut props);
 
-	for i in 0..(props.memoryTypeCount as usize) {
+	for i in 0..(props.memory_type_count as usize) {
 		// Memory type req's matches vkGetImageMemoryRequirements()?
 		if (type_bits & 1) == 1
-			&& (props.memoryTypes[i].propertyFlags & reqs_mask) ==
+			&& (props.memory_types[i].property_flags & reqs_mask) ==
 				reqs_mask
 		{
 			return i as u32;
@@ -641,31 +688,31 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	image_count: &mut u32, color_format: VkFormat,
 	present_mode: VkPresentModeKHR, swap_images: *mut VkImage)
 {
-	// Set Data
-	let swapChainCreateInfo = VkSwapchainCreateInfoKHR {
-		s_type: VkStructureType::SwapchainCreateInfo,
-		p_next: ptr::null(),
-		flags: 0,
-		surface: surface,
-		min_image_count: *image_count,
-		image_format: color_format,
-		image_color_space: VkColorSpaceKHR::SrgbNonlinearKhr,
-		image_extent: VkExtent2D { width, height },
-		image_array_layers: 1,
-		image_usage: VkImageUsage::ColorAttachmentBit,
-		image_sharing_mode: VkSharingMode::Exclusive,
-		pre_transform: VkSurfaceTransformFlagBitsKHR::Identity,
-		composite_alpha: VkCompositeAlphaFlagBitsKHR::Opaque,
-		present_mode: present_mode,
-		clipped: 1,
-		old_swapchain: mem::zeroed(), // vulkan->swapchain,
-		queue_family_index_count: 0,
-		p_queue_family_indices: ptr::null(),
-	};
-
-	// Run Functions
-	(connection.new_swapchain)(device, &swapChainCreateInfo, ptr::null(),
-		swapchain);
+	(connection.new_swapchain)(
+		device,
+		&VkSwapchainCreateInfoKHR {
+			s_type: VkStructureType::SwapchainCreateInfo,
+			p_next: ptr::null(),
+			flags: 0,
+			surface: surface,
+			min_image_count: *image_count,
+			image_format: color_format,
+			image_color_space: VkColorSpaceKHR::SrgbNonlinearKhr,
+			image_extent: VkExtent2D { width, height },
+			image_array_layers: 1,
+			image_usage: VkImageUsage::ColorAttachmentBit,
+			image_sharing_mode: VkSharingMode::Exclusive,
+			pre_transform: VkSurfaceTransformFlagBitsKHR::Identity,
+			composite_alpha: VkCompositeAlphaFlagBitsKHR::Opaque,
+			present_mode: present_mode,
+			clipped: 1,
+			old_swapchain: mem::zeroed(), // vulkan->swapchain,
+			queue_family_index_count: 0,
+			p_queue_family_indices: ptr::null(),
+		},
+		ptr::null(),
+		swapchain
+	);
 
 	(connection.get_swapcount)(device, *swapchain, image_count,
 		ptr::null_mut());
@@ -824,7 +871,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 		device,
 		&VkMemoryAllocateInfo {
 			s_type: VkStructureType::MemoryAllocateInfo,
-			p_next: ptr::null(),
+			next: ptr::null(),
 			allocation_size: memory_reqs.size,
 			memory_type_index: get_memory_type(
 				connection,
@@ -937,8 +984,9 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	(image, image_view, image_memory)
 }
 
-pub unsafe fn create_render_pass(connection: &Connection, device: VkDevice,
-	color_format: &VkFormat) -> VkRenderPass
+#[inline(always)] pub(in renderer) unsafe fn create_render_pass(
+	connection: &Connection, device: VkDevice, color_format: &VkFormat)
+	-> VkRenderPass
 {
 	let mut render_pass = mem::uninitialized();
 
@@ -1015,10 +1063,11 @@ pub unsafe fn create_render_pass(connection: &Connection, device: VkDevice,
 	render_pass
 }
 
-pub unsafe fn create_framebuffers(connection: &Connection, device: VkDevice,
-	image_count: u32, render_pass: VkRenderPass,
-	present_imgviews: &[VkImageView], depth_imgview: VkImageView,
-	width: u32, height: u32, fbs: &mut[VkFramebuffer])
+#[inline(always)] pub(in renderer) unsafe fn create_framebuffers(
+	connection: &Connection, device: VkDevice, image_count: u32,
+	render_pass: VkRenderPass, present_imgviews: &[VkImageView],
+	depth_imgview: VkImageView, width: u32, height: u32,
+	fbs: &mut[VkFramebuffer])
 {
 	// create a framebuffer per swap chain imageView:
 	for i in 0..(image_count as usize) {
@@ -1040,6 +1089,197 @@ pub unsafe fn create_framebuffers(connection: &Connection, device: VkDevice,
 			&mut fbs[i]
 		);
 	}
+}
+
+#[inline(always)] pub(in renderer) unsafe fn destroy_swapchain(
+	connection: &Connection, device: VkDevice,
+	frame_buffers: &[VkFramebuffer], present_imgviews: &[VkImageView],
+	depth_imgview: VkImageView, render_pass: VkRenderPass, image_count: u32,
+	depth_image: VkImage, swapchain: VkSwapchainKHR,
+	depth_image_memory: VkDeviceMemory)
+{
+	// Free framebuffers & image view #1
+	for i in 0..(image_count as usize) {
+		(connection.drop_framebuffer)(device, frame_buffers[i],
+			ptr::null());
+		(connection.drop_imgview)(device, present_imgviews[i],
+			ptr::null());
+//		(connection.drop_image)(device, present_images[i], ptr::null());
+	}
+	// Free render pass
+	(connection.drop_renderpass)(device, render_pass, ptr::null());
+	// Free depth buffer
+	(connection.drop_imgview)(device, depth_imgview, ptr::null());
+	(connection.drop_image)(device, depth_image, ptr::null());
+	(connection.drop_memory)(device, depth_image_memory, ptr::null());
+	// Free image view #2
+//	vkDestroyFence(vulkan->device, vulkan->submit_fence, NULL);  // TODO: Mem Error
+	// Free swapchain
+	(connection.drop_swapchain)(device, swapchain, ptr::null());
+}
+
+pub(in renderer) unsafe fn txuniform(connection: &Connection, device: VkDevice,
+	desc_set: VkDescriptorSet, tex_count: u32, tex_sampler: VkSampler,
+	tex_view: VkImageView, matrix_buffer: VkBuffer)
+{
+	let num_writes = tex_count != 0;
+
+	let write0 = VkWriteDescriptorSet {
+		s_type: VkStructureType::WriteDescriptorSet,
+		next: ptr::null(),
+		dst_set: desc_set,
+		descriptor_count: 1,
+		descriptor_type: VkDescriptorType::UniformBuffer,
+		buffer_info: &VkDescriptorBufferInfo {
+			buffer: matrix_buffer,
+			offset: 0,
+			range: (mem::size_of::<f32>() * 4) as u64,
+		},
+		dst_array_element: 0,
+		texel_buffer_view: ptr::null(),
+		dst_binding: 0,
+		image_info: ptr::null(),
+	};
+
+	(connection.update_descsets)(
+		device,
+		if num_writes { 2 } else { 1 },
+		if num_writes { &write0 } else { [write0,
+			VkWriteDescriptorSet {
+				s_type: VkStructureType::WriteDescriptorSet,
+				next: ptr::null(),
+				dst_set: desc_set,
+				dst_binding: 1,
+				descriptor_count: tex_count,
+				descriptor_type: VkDescriptorType::CombinedImageSampler,
+				image_info: &VkDescriptorImageInfo {
+					sampler: tex_sampler,
+					image_view: tex_view,
+					image_layout: VkImageLayout::General,
+				},
+				buffer_info: ptr::null(),
+				dst_array_element: 0,
+				texel_buffer_view: ptr::null(),
+			}].as_ptr()
+		},
+		0,
+		ptr::null(),
+	);
+}
+
+pub(in renderer) unsafe fn vw_instance_new(connection: &Connection,
+	device: VkDevice, gpu: VkPhysicalDevice, pipeline: ::renderer::Style,
+	num_floats: usize, tex_view: VkImageView, tex_sampler: VkSampler,
+	tex_count: u32) -> ::renderer::VwInstance
+{
+	const VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT: VkFlags = 0x00000002;
+	const VK_MEMORY_PROPERTY_HOST_COHERENT_BIT: VkFlags = 0x00000004;
+
+	let mut uniform_buffer = mem::uninitialized();
+	let mut desc_pool = mem::uninitialized();
+	let mut desc_set = mem::uninitialized();
+	let mut uniform_memory = mem::uninitialized();
+	let mut mem_reqs = mem::uninitialized();
+
+	// Buffers
+	(connection.new_buffer)(
+		device,
+		&VkBufferCreateInfo {
+			s_type: VkStructureType::BufferCreateInfo,
+			next: ptr::null(),
+			flags: 0,
+			size: (mem::size_of::<f32>() * num_floats) as u64,
+			usage: VkBufferUsage::UniformBufferBit,
+			sharing_mode: VkSharingMode::Exclusive,
+			queue_family_index_count: 0,
+			queue_family_indices: ptr::null(),
+		},
+		ptr::null(),
+		&mut uniform_buffer
+	);
+
+	// Descriptor Pool
+	(connection.new_descpool)(
+		device,
+		&VkDescriptorPoolCreateInfo {
+			s_type: VkStructureType::DescriptorPoolCreateInfo,
+			next: ptr::null(),
+			flags: 0,
+			max_sets: 1,
+			pool_size_count: 1,
+			pool_sizes: &VkDescriptorPoolSize {
+				 descriptor_type: VkDescriptorType::UniformBuffer,
+				 descriptor_count: 1,
+			},
+		},
+		ptr::null(),
+		&mut desc_pool
+	);
+
+	(connection.new_descsets)(
+		device,
+		&VkDescriptorSetAllocateInfo {
+			s_type: VkStructureType::DescriptorSetAllocateInfo,
+			next: ptr::null(),
+			descriptor_pool: desc_pool,
+			descriptor_set_count: 1,
+			set_layouts: &pipeline.descsetlayout
+		},
+		&mut desc_set
+	);
+
+	// Allocate memory for uniform buffer.
+	(connection.get_bufmemreq)(
+		device,
+		uniform_buffer,
+		&mut mem_reqs
+	);
+
+	(connection.mem_allocate)(
+		device,
+		&VkMemoryAllocateInfo {
+			s_type: VkStructureType::MemoryAllocateInfo,
+			next: ptr::null(),
+			allocation_size: mem_reqs.size,
+			memory_type_index: get_memory_type(
+				connection,
+				gpu,
+				mem_reqs.memory_type_bits,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+				VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+		},
+		ptr::null(),
+		&mut uniform_memory
+	);
+
+	(connection.bind_buffer_mem)(
+		device,
+		uniform_buffer,
+		uniform_memory,
+		0
+	);
+// }
+	txuniform(connection, device, desc_set, tex_count, tex_sampler,
+		tex_view, uniform_buffer);
+
+	::renderer::VwInstance {
+		matrix_buffer: uniform_buffer,
+		uniform_memory,
+		desc_set,
+		desc_pool,
+		pipeline
+	}
+}
+
+pub unsafe fn destroy_uniforms(connection: &Connection,
+	device: VkDevice, uniform_memory: VkDeviceMemory,
+	desc_set: VkDescriptorSet, desc_pool: VkDescriptorPool,
+	uniform_buffer: VkBuffer) -> ()
+{
+	(connection.drop_memory)(device, uniform_memory, ptr::null());
+	(connection.drop_descsets)(device, desc_pool, 1, &desc_set);
+	(connection.drop_descpool)(device, desc_pool, ptr::null());
+	(connection.drop_buffer)(device, uniform_buffer, ptr::null());
 }
 
 pub unsafe fn destroy_instance(connection: &Connection) -> () {
