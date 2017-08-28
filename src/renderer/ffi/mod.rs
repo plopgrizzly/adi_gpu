@@ -27,7 +27,7 @@ pub enum NativeRenderer {
 
 #[cfg(any(target_os = "windows", target_os = "linux", target_os = "android"))]
 impl ::RenderOps for NativeRenderer {
-	fn new(app_name: &str, window: ::window::WindowConnection) -> Self {
+	fn new(app_name: &str, window: ::awi::WindowConnection) -> Self {
 		NativeRenderer::Vulkan(
 			vulkan::VulkanRenderer::new(app_name, window)
 		)
@@ -51,7 +51,7 @@ pub enum NativeRenderer {
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 impl ::RenderOps for NativeRenderer {
-	fn new(app_name: &str, window: ::window::WindowConnection) -> Self {
+	fn new(app_name: &str, window: ::awi::WindowConnection) -> Self {
 		NativeRenderer::Vulkan(
 			vulkan::VulkanRenderer::new(app_name, window)
 		)
@@ -78,7 +78,7 @@ pub enum NativeRenderer {
 	target_os = "openbsd", target_os = "netbsd",
 	target_os = "web_assembly"))]
 impl ::RenderOps for NativeRenderer {
-	fn new(app_name: &str, window: ::window::WindowConnection) -> Self {
+	fn new(app_name: &str, window: ::awi::WindowConnection) -> Self {
 		NativeRenderer::Vulkan(
 			vulkan::OpenGLRenderer::new(app_name, window)
 		)
@@ -104,7 +104,7 @@ pub enum NativeRenderer {
 
 #[cfg(target_os = "nintendo_switch")]
 impl ::RenderOps for NativeRenderer {
-	fn new(app_name: &str, window: ::window::WindowConnection) -> Self {
+	fn new(app_name: &str, window: ::awi::WindowConnection) -> Self {
 		NativeRenderer::Vulkan(
 			vulkan::VulkanRenderer::new(app_name, window)
 		)

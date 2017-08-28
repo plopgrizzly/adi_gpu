@@ -9,7 +9,7 @@
 // #![no_std]
 
 extern crate ami;
-extern crate window;
+extern crate awi;
 
 /// Transform represents a transformation matrix.
 #[must_use]
@@ -80,9 +80,9 @@ mod render_ops;
 mod ali_vulkan;
 
 pub mod input {
-	pub use window::InputQueue as Queue;
-	pub use window::Msg;
-	pub use window::Input;
+	pub use awi::InputQueue as Queue;
+	pub use awi::Msg;
+	pub use awi::Input;
 }
 
 pub use render_ops::RenderOps;
@@ -90,7 +90,7 @@ pub use render_ops::RenderOps;
 /// To render anything with The Willow Graphics API, you have to make a
 /// `Display`
 pub struct Display {
-	window: window::Window,
+	window: awi::Window,
 	renderer: renderer::Renderer,
 }
 
@@ -98,7 +98,7 @@ impl Display {
 	/// Connect to the display as a window with a name and icon.  Icon is in
 	/// aci image format: `[ width, height, bgra pixels ]`.
 	pub fn new(name: &str, icon: &Vec<u32>) -> Display {
-		let window = window::Window::new(name, icon);
+		let window = awi::Window::new(name, icon);
 		let renderer = renderer::Renderer::new(name,
 			window.get_connection());
 

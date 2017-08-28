@@ -36,7 +36,7 @@ build = "build.rs"
 
 [dependencies]
 ami = "^0.4"
-window = { path = "../window" }
+awi = { path = "../awi" }
 
 [build-dependencies.gcc]
 version = "0.3.50"

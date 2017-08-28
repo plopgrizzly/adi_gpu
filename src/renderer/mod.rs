@@ -8,8 +8,8 @@
 
 use std::mem;
 
-// use window::Window;
-use window::WindowConnection;
+// use awi::Window;
+use awi::WindowConnection;
 
 use self::ffi::vulkan;
 // use self::ffi::NativeRenderer;
@@ -59,21 +59,18 @@ pub struct Shader {
 }
 
 impl Shader {
-	pub fn create(vw: &Vw, vert: &'static [u8], frag:&'static [u8],
+	pub fn create(connection: &Connection, device: VkDevice, vert: &'static [u8], frag:&'static [u8],
 		textures: u32) -> Shader
 	{
-		// TODO: has_data
-		let mut shader = Shader {
-			vertex: unsafe { mem::uninitialized() },
-			fragment: unsafe { mem::uninitialized() },
-			textures, has_data: 0
+		let (vertex, fragment) = unsafe {		
+			vulkan::ffi::new_shader(connection, device, vert, frag)
 		};
 
-		unsafe {		
-			vw_vulkan_shader(&mut shader, vw, &vert[0],
-				vert.len() as u32, &frag[0], frag.len() as u32);
+		// TODO: has_data
+		Shader {
+			vertex, fragment, textures,
+			has_data: 0
 		}
-		shader
 	}
 }
 
@@ -133,7 +130,7 @@ pub struct Shape {
 			vertex_input_buffer: 0,
 			vertice_count: size / 8,
 		};
-		unsafe { vw_vulkan_shape(&mut shape, window.vw, &v[0], size); }
+		unsafe { vulkan::ffi::new_shape(&mut shape, window.vw, &v[0], size); }
 		Shape {
 			shape: shape,
 			hastx: hastx,
@@ -236,16 +233,14 @@ pub struct VwInstance {
 }
 
 extern {
-	fn vw_vulkan_shape(a: *mut VwShape, b: *const Vw, c: *const f32, d: u32)
-		-> ();
-//
 	fn vw_vulkan_shader(a: *mut Shader, b: *const Vw, c: *const u8, d: u32,
 		e: *const u8, f: u32) -> ();
 	fn vw_vulkan_pipeline(z: *mut Style, a: *mut Vw, b: *const Shader,
 		c: u32);
 	fn vw_vulkan_draw_begin(v: *mut Vw, r: f32, g: f32, b: f32) -> ();
-	fn vw_vulkan_uniforms(a: *const Vw, b: Style,
-		c: *const NativeTexture, d: u8) -> VwInstance;
+// TODO: In Rust
+//	fn vw_vulkan_uniforms(a: *const Vw, b: Style,
+//		c: *const NativeTexture, d: u8) -> VwInstance;
 	fn vw_vulkan_draw_shape(v: *mut Vw, s: *const VwShape, f: VwInstance)
 		-> ();
 	fn vw_vulkan_draw_update(v: *mut Vw) -> ();
@@ -446,21 +441,20 @@ impl Renderer {
 		let (mut connection, mut vw) = Vw::new(window_name, window_connection);
 		let shapes = Vec::new();
 		let shadev = vec![
-			Shader::create(&vw, include_bytes!("../native_renderer/vulkan/res/solid-vert.spv"),
+			Shader::create(&connection, vw.device,
+				include_bytes!("../native_renderer/vulkan/res/solid-vert.spv"),
 				include_bytes!("../native_renderer/vulkan/res/solid-frag.spv"), 0)
 		];
-		let mut styles = vec![
-			Style {
-				pipeline: unsafe { mem::uninitialized() },
-				descsetlayout: unsafe { mem::uninitialized() },
-				pipeline_layout: unsafe { mem::uninitialized() }
-			};
-			shadev.len()
-		];
 
-		unsafe {
-			vw_vulkan_pipeline(&mut styles[0], &mut vw, &shadev[0],
-				shadev.len() as u32);
+		let mut styles = Vec::with_capacity(shadev.len());
+		for i in &shadev {
+			styles.push(
+				unsafe {
+					vulkan::ffi::new_pipeline(&connection,
+						vw.device, vw.render_pass,
+						vw.width, vw.height, shadev[0])
+				}
+			);
 		}
 
 		let projection = projection(vw.height as f32 / vw.width as f32,
@@ -506,16 +500,20 @@ impl Renderer {
 	pub fn solid(&mut self, vertices: Vec<f32>, color: ::Color) -> usize {
 		let size = vertices.len() as u32;
 		let hastx = false;
-		let mut shape = VwShape {
-			vertex_buffer_memory: unsafe { mem::zeroed() },
-			vertex_input_buffer: unsafe { mem::zeroed() },
-			vertice_count: size / 4,
+
+		let (vertex_input_buffer, vertex_buffer_memory) = unsafe {
+			vulkan::ffi::new_shape(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				vertices.as_slice(),
+			)
 		};
 
-		unsafe {
-			vw_vulkan_shape(&mut shape, &self.vw, vertices.as_ptr(),
-				size);
-		}
+		let shape = VwShape {
+			vertex_buffer_memory, vertex_input_buffer,
+			vertice_count: size / 4,
+		};
 
 		let a = self.shapes.len();
 

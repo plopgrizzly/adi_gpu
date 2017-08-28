@@ -16,6 +16,9 @@ use std::ffi::CString;
 
 const VERSION: (u32, &'static str) = (4194304, "vulkan 1.0.0");
 
+const VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT: VkFlags = 0x00000002;
+const VK_MEMORY_PROPERTY_HOST_COHERENT_BIT: VkFlags = 0x00000004;
+
 /*
 // Link to Kernel32
 extern "system" {
@@ -126,6 +129,20 @@ pub struct Connection {
 	new_descsets: unsafe extern "system" fn(VkDevice,
 		*const VkDescriptorSetAllocateInfo, *mut VkDescriptorSet)
 		-> VkResult,
+	new_shademod: unsafe extern "system" fn(VkDevice,
+		*const VkShaderModuleCreateInfo, *const Void,
+		*mut VkShaderModule) -> VkResult,
+	drop_shademod: unsafe extern "system" fn(VkDevice, VkShaderModule,
+		*const Void) -> (),
+	new_pipeline: unsafe extern "system" fn(VkDevice, VkPipelineCache, u32,
+		*const VkGraphicsPipelineCreateInfo, *const Void,
+		*mut VkPipeline) -> VkResult,
+	new_pipeline_layout: unsafe extern "system" fn(VkDevice,
+		*const VkPipelineLayoutCreateInfo, *const Void,
+		*mut VkPipelineLayout) -> VkResult,
+	new_descset_layout: unsafe extern "system" fn(VkDevice,
+		*const VkDescriptorSetLayoutCreateInfo, *const Void,
+		*mut VkDescriptorSetLayout) -> VkResult,
 }
 
 pub unsafe fn load(app_name: &str) -> Connection {
@@ -179,6 +196,13 @@ pub unsafe fn load(app_name: &str) -> Connection {
 		new_buffer: vk_sym(vk, vksym, b"vkCreateBuffer\0"),
 		new_descpool: vk_sym(vk, vksym, b"vkCreateDescriptorPool\0"),
 		new_descsets: vk_sym(vk, vksym, b"vkAllocateDescriptorSets\0"),
+		new_shademod: vk_sym(vk, vksym, b"vkCreateShaderModule\0"),
+		drop_shademod: vk_sym(vk, vksym, b"vkDestroyShaderModule\0"),
+		new_pipeline: vk_sym(vk, vksym, b"vkCreateGraphicsPipelines\0"),
+		new_pipeline_layout:
+			vk_sym(vk, vksym, b"vkCreatePipelineLayout\0"),
+		new_descset_layout:
+			vk_sym(vk, vksym, b"vkCreateDescriptorSetLayout\0"),
 	}
 }
 
@@ -532,11 +556,10 @@ pub unsafe fn create_command_buffer(connection: &Connection, device: VkDevice,
 pub unsafe fn map_memory(connection: &Connection, device: VkDevice,
 	vb_memory: VkDeviceMemory, size: u64) -> *mut f32
 {
-	let mut mapped = ptr::null_mut();
+	let mut mapped = mem::uninitialized();
 
-	/*vw_vulkan_error("Failed to test map buffer memory.", */
 	(connection.mapmem)(device, vb_memory, 0, size, 0, &mut mapped);
-	/*);*/
+
 	mapped
 }
 
@@ -1172,9 +1195,6 @@ pub(in renderer) unsafe fn vw_instance_new(connection: &Connection,
 	num_floats: usize, tex_view: VkImageView, tex_sampler: VkSampler,
 	tex_count: u32) -> ::renderer::VwInstance
 {
-	const VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT: VkFlags = 0x00000002;
-	const VK_MEMORY_PROPERTY_HOST_COHERENT_BIT: VkFlags = 0x00000004;
-
 	let mut uniform_buffer = mem::uninitialized();
 	let mut desc_pool = mem::uninitialized();
 	let mut desc_set = mem::uninitialized();
@@ -1268,6 +1288,361 @@ pub(in renderer) unsafe fn vw_instance_new(connection: &Connection,
 		desc_set,
 		desc_pool,
 		pipeline
+	}
+}
+
+pub(in renderer) unsafe fn new_shape(connection: &Connection, device: VkDevice,
+	gpu: VkPhysicalDevice, vertices: &[f32]) -> (VkBuffer, VkDeviceMemory)
+{
+	let size = (mem::size_of::<f32>() * vertices.len()) as u64;
+
+	let mut vertex_input_buffer = mem::uninitialized();
+	let mut vertex_buffer_memory = mem::uninitialized();
+	let mut vb_memreqs = mem::uninitialized();
+
+	// Create Vertex Buffer
+	(connection.new_buffer)(
+		device,
+		&VkBufferCreateInfo {
+			s_type: VkStructureType::BufferCreateInfo,
+			next: ptr::null(),
+			flags: 0,
+			size: size, // size in Bytes
+			usage: VkBufferUsage::VertexBufferBit,
+			sharing_mode: VkSharingMode::Exclusive,
+			queue_family_index_count: 0,
+			queue_family_indices: ptr::null(),
+		},
+		ptr::null(),
+		&mut vertex_input_buffer
+	);
+
+	// Allocate memory for vertex buffer.
+	(connection.get_bufmemreq)(
+		device,
+		vertex_input_buffer,
+		&mut vb_memreqs,
+	);
+
+	(connection.mem_allocate)(
+		device,
+		&VkMemoryAllocateInfo {
+			s_type: VkStructureType::MemoryAllocateInfo,
+			next: ptr::null(),
+			allocation_size: vb_memreqs.size,
+			memory_type_index: get_memory_type(
+				connection,
+				gpu,
+				vb_memreqs.memory_type_bits,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ),
+		},
+		ptr::null(),
+		&mut vertex_buffer_memory,
+	);
+
+	
+	// Copy buffer data.
+	let mut mapped = mem::uninitialized();
+
+	(connection.mapmem)(
+		device,
+		vertex_buffer_memory,
+		0,
+		size,
+		0,
+		&mut mapped
+	);
+
+	ptr::copy_nonoverlapping(vertices.as_ptr(), mapped, vertices.len());
+
+	(connection.unmap)(device, vertex_buffer_memory);
+
+	(connection.bind_buffer_mem)(
+		device,
+		vertex_input_buffer,
+		vertex_buffer_memory,
+		0
+	);
+
+	(vertex_input_buffer, vertex_buffer_memory)
+}
+
+pub(in renderer) unsafe fn new_shader(connection: &Connection, device: VkDevice,
+	vertex_shader: &[u8], fragment_shader: &[u8])
+	-> (VkShaderModule, VkShaderModule)
+{
+	let mut vertex = mem::uninitialized();
+	let mut fragment = mem::uninitialized();
+
+	// Vertex Shader
+	(connection.new_shademod)(
+		device,
+		&VkShaderModuleCreateInfo {
+			s_type: VkStructureType::ShaderModuleCreateInfo,
+			next: ptr::null(),
+			flags: 0,
+			code_size: vertex_shader.len(),
+			code: vertex_shader.as_ptr(),
+		},
+		ptr::null(),
+		&mut vertex
+	);
+
+	// Fragment Shader
+	(connection.new_shademod)(
+		device,
+		&VkShaderModuleCreateInfo {
+			s_type: VkStructureType::ShaderModuleCreateInfo,
+			next: ptr::null(),
+			flags: 0,
+			code_size: fragment_shader.len(),
+			code: fragment_shader.as_ptr(),
+		},
+		ptr::null(),
+		&mut fragment
+	);
+
+	(vertex, fragment)
+}
+
+pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
+	device: VkDevice, render_pass: VkRenderPass, width: u32, height: u32,
+	shader: ::renderer::Shader) -> ::renderer::Style
+{
+	let mut pipeline = mem::uninitialized();
+	let mut pipeline_layout = mem::uninitialized();
+	let mut descsetlayout = mem::uninitialized();
+
+	// depth/stencil config:
+	const no_op_stencil_state: VkStencilOpState = VkStencilOpState {
+		fail_op: VkStencilOp::Keep,
+		pass_op: VkStencilOp::Keep,
+		depth_fail_op: VkStencilOp::Keep,
+		compare_op: VkCompareOp::Always,
+		compare_mask: 0,
+		write_mask: 0,
+		reference: 0,
+	};
+
+	(connection.new_descset_layout)(
+		device,
+		&VkDescriptorSetLayoutCreateInfo {
+			s_type: VkStructureType::DescriptorSetLayoutCreateInfo,
+			next: ptr::null(),
+			flags: 0,
+			binding_count: 1/* + shaders[i].textures*/,
+			bindings: [
+				VkDescriptorSetLayoutBinding {
+					binding: 0,
+					descriptor_type: VkDescriptorType::UniformBuffer,
+					descriptor_count: 1,
+					stage_flags: VkShaderStage::Vertex,
+					immutable_samplers: ptr::null(),
+				},
+				VkDescriptorSetLayoutBinding {
+					binding: 1,
+					descriptor_type: VkDescriptorType::CombinedImageSampler,
+					descriptor_count: 1, // Texture Count
+					stage_flags: VkShaderStage::Fragment,
+					immutable_samplers: ptr::null(),
+				},
+			].as_ptr(),
+		},
+		ptr::null(),
+		&mut descsetlayout
+	);
+
+	// pipeline layout:
+	(connection.new_pipeline_layout)(
+		device,
+		&VkPipelineLayoutCreateInfo {
+			s_type: VkStructureType::PipelineLayoutCreateInfo,
+			next: ptr::null(),
+			flags: 0,
+			set_layout_count: 1,
+			set_layouts: [descsetlayout].as_ptr(),
+			push_constant_range_count: 0,
+			push_constant_ranges: ptr::null(),
+		},
+		ptr::null(),
+		&mut pipeline_layout
+	);
+
+	// setup shader stages:
+	(connection.new_pipeline)(
+		device,
+		mem::zeroed(), 
+		1,
+		&VkGraphicsPipelineCreateInfo {
+			s_type: VkStructureType::GraphicsPipelineCreateInfo,
+			next: ptr::null(),
+			flags: 0,
+			stage_count: 2,
+			stages: [
+				VkPipelineShaderStageCreateInfo {
+					s_type: VkStructureType::PipelineShaderStageCreateInfo,
+					next: ptr::null(),
+					flags: 0,
+					stage: VkShaderStage::Vertex,
+					module: shader.vertex,
+					name: b"main\0".as_ptr(), // shader main function name
+					specialization_info: ptr::null(),
+				},
+				VkPipelineShaderStageCreateInfo {
+					s_type: VkStructureType::PipelineShaderStageCreateInfo,
+					next: ptr::null(),
+					flags: 0,
+					stage: VkShaderStage::Fragment,
+					module: shader.fragment,
+					name: b"main\0".as_ptr(), // shader main function name
+					specialization_info: ptr::null(),
+				},
+			].as_ptr(),
+			vertex_input_state: &VkPipelineVertexInputStateCreateInfo {
+				s_type: VkStructureType::PipelineVertexInputStateCreateInfo,
+				next: ptr::null(),
+				flags: 0,
+				vertex_binding_description_count: 1,
+				vertex_binding_descriptions: &VkVertexInputBindingDescription {
+					binding: 0,
+					stride: (mem::size_of::<f32>() * 4 /* * 2*/) as u32,
+					input_rate: VkVertexInputRate::Vertex,
+				},
+				vertex_attribute_description_count: 1/*2*/,
+				vertex_attribute_descriptions: [
+					VkVertexInputAttributeDescription {
+						location: 0,
+						binding: 0,
+						format: VkFormat::R32g32b32a32Sfloat,
+						offset: 0,
+					},
+					/*VkVertexInputAttributeDescription {
+						.location: 1,
+						.binding: 0,
+						.format: VkFormat::R32g32b32a32Sfloat,
+						.offset: 4 * sizeof(float),
+					},*/
+				].as_ptr(),
+			},
+			input_assembly_state: &VkPipelineInputAssemblyStateCreateInfo {
+				s_type: VkStructureType::PipelineInputAssemblyStateCreateInfo,
+				next: ptr::null(),
+				flags: 0,
+				topology: VkPrimitiveTopology::TriangleList,
+				primitive_restart_enable: 0,
+			},
+			tessellation_state: ptr::null(),
+			viewport_state: &VkPipelineViewportStateCreateInfo {
+				s_type: VkStructureType::PipelineViewportStateCreateInfo,
+				next: ptr::null(),
+				flags: 0,
+				viewport_count: 1,
+				viewports: &VkViewport {
+					x: 0.0, y: 0.0,
+					width: width as f32,
+					height: height as f32,
+					min_depth: 0.0,
+					max_depth: 1.0,
+				},
+				scissor_count: 1,
+				scissors: &VkRect2D {
+					offset: VkOffset2D { x: 0, y: 0 },
+					extent: VkExtent2D { width, height },
+				},
+			},
+			rasterization_state: &VkPipelineRasterizationStateCreateInfo {
+				s_type: VkStructureType::PipelineRasterizationStateCreateInfo,
+				next: ptr::null(),
+				flags: 0,
+				depth_clamp_enable: 0,
+				rasterizer_discard_enable: 0,
+				polygon_mode: VkPolygonMode::Fill,
+				cull_mode: VkCullMode::Back,
+				front_face: VkFrontFace::CounterClockwise,
+				depth_bias_enable: 0,
+				depth_bias_constant_factor: 0.0,
+				depth_bias_clamp: 0.0,
+				depth_bias_slope_factor: 0.0,
+				line_width: 1.0,
+			},
+			multisample_state: &VkPipelineMultisampleStateCreateInfo {
+				s_type: VkStructureType::PipelineMultisampleStateCreateInfo,
+				next: ptr::null(),
+				flags: 0,
+				rasterization_samples: VkSampleCount::Sc1,
+				sample_shading_enable: 0,
+				min_sample_shading: 0.0,
+				sample_mask: ptr::null(),
+				alpha_to_coverage_enable: 0,
+				alpha_to_one_enable: 0,
+			},
+			depth_stencil_state: &VkPipelineDepthStencilStateCreateInfo {
+				s_type: VkStructureType::PipelineDepthStencilStateCreateInfo,
+				next: ptr::null(),
+				flags: 0,
+				depth_test_enable: 1,
+				depth_write_enable: 1,
+				depth_compare_op: VkCompareOp::LessOrEqual,
+				depth_bounds_test_enable: 0,
+				stencil_test_enable: 0,
+				front: no_op_stencil_state,
+				back: no_op_stencil_state,
+				min_depth_bounds: 0.0,
+				max_depth_bounds: 0.0,
+			},
+			color_blend_state: &VkPipelineColorBlendStateCreateInfo {
+				s_type: VkStructureType::PipelineColorBlendStateCreateInfo,
+				next: ptr::null(),
+				flags: 0,
+				logic_op_enable: 0,
+				logic_op: VkLogicOp::Clear,
+				attachment_count: 1,
+				attachments: &VkPipelineColorBlendAttachmentState {
+					blend_enable: 1,
+					src_color_blend_factor: VkBlendFactor::SrcAlpha,
+					dst_color_blend_factor: VkBlendFactor::OneMinusSrcAlpha,
+					color_blend_op: VkBlendOp::Add,
+					src_alpha_blend_factor: VkBlendFactor::SrcAlpha,
+					dst_alpha_blend_factor: VkBlendFactor::One,
+					alpha_blend_op: VkBlendOp::Add,
+					color_write_mask: 0xf, // RGBA
+				},
+				blend_constants: [0.0, 0.0, 0.0, 0.0],
+			},
+			dynamic_state: &VkPipelineDynamicStateCreateInfo {
+				s_type: VkStructureType::PipelineDynamicStateCreateInfo,
+				next: ptr::null(),
+				flags: 0,
+				dynamic_state_count: 2,
+				dynamic_states: [
+					VkDynamicState::Viewport, VkDynamicState::Scissor
+				].as_ptr(),
+			},
+			layout: pipeline_layout,
+			render_pass: render_pass,
+			subpass: 0,
+			base_pipeline_handle: mem::zeroed(), // NULL TODO: ?
+			base_pipeline_index: 0,
+		},
+		ptr::null(),
+		&mut pipeline
+	);
+
+	(connection.drop_shademod)(
+		device,
+		shader.vertex,
+		ptr::null(),
+	);
+	(connection.drop_shademod)(
+		device,
+		shader.fragment,
+		ptr::null(),
+	);
+
+	::renderer::Style {
+		pipeline,
+		pipeline_layout,
+		descsetlayout,
 	}
 }
 

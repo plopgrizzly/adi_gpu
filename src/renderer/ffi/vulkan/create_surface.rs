@@ -11,7 +11,7 @@
 use std::mem;
 
 use ami::*;
-use window::WindowConnection;
+use awi::WindowConnection;
 
 use super::ffi::types::*;
 use super::check_error;

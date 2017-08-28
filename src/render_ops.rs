@@ -8,7 +8,7 @@
 
 pub trait RenderOps {
 	// Create the renderer.
-	fn new(app_name: &str, window: ::window::WindowConnection) -> Self;
+	fn new(app_name: &str, window: ::awi::WindowConnection) -> Self;
 	// Do the rendering.
 	fn update(&self) -> ();
 }

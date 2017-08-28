@@ -9,7 +9,7 @@
 pub struct WillowRenderer { }
 
 impl ::RenderOps for WillowRenderer {
-	fn new(app_name: &str, window: ::window::WindowConnection) -> Self {
+	fn new(app_name: &str, window: ::awi::WindowConnection) -> Self {
 		WillowRenderer { }
 	}
 

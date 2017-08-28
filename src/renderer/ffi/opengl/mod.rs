@@ -9,7 +9,7 @@
 pub struct OpenGLRenderer { }
 
 impl ::RenderOps for OpenGLRenderer {
-	fn new(app_name: &str, window: ::window::WindowConnection) -> Self {
+	fn new(app_name: &str, window: ::awi::WindowConnection) -> Self {
 		OpenGLRenderer { }
 	}
 

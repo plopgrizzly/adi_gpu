@@ -22,7 +22,7 @@ pub struct VulkanRenderer {
 }
 
 impl ::RenderOps for VulkanRenderer {
-	fn new(app_name: &str, window: ::window::WindowConnection) -> Self {
+	fn new(app_name: &str, window: ::awi::WindowConnection) -> Self {
 		let native = vulkan::Vulkan::new(app_name).unwrap();
 
 		VulkanRenderer { native }

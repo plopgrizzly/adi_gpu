@@ -12,6 +12,7 @@ use ami::Void;
 pub type VkDeviceSize = u64;
 pub type VkFlags = u32;
 pub type VkBool32 = u32;
+pub type VkSampleMask = u32;
 
 // Non-Dispatchable Handles
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkSurfaceKHR(u64);
@@ -31,6 +32,7 @@ pub type VkBool32 = u32;
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkSampler(u64);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkDescriptorSet(u64);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkDescriptorPool(u64);
+#[repr(C)] #[derive(Copy, Clone)] pub struct VkPipelineCache(u64);
 
 // Dispatchable Handles
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkDevice(*mut Void);
@@ -38,6 +40,228 @@ pub type VkBool32 = u32;
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkInstance(*mut Void);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkCommandBuffer(*mut Void);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkQueue(*mut Void);
+
+#[repr(C)] pub struct VkPushConstantRange {
+	pub stage_flags: VkShaderStage,
+	pub offset: u32,
+	pub size: u32,
+}
+
+#[repr(C)] pub struct VkPipelineTessellationStateCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub patch_control_points: u32,
+}
+
+#[repr(C)] pub struct VkStencilOpState {
+	pub fail_op: VkStencilOp,
+	pub pass_op: VkStencilOp,
+	pub depth_fail_op: VkStencilOp,
+	pub compare_op: VkCompareOp,
+	pub compare_mask: u32,
+	pub write_mask: u32,
+	pub reference: u32,
+}
+
+#[repr(C)] pub struct VkDescriptorSetLayoutCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub binding_count: u32,
+	pub bindings: *const VkDescriptorSetLayoutBinding,
+}
+
+#[repr(C)] pub struct VkDescriptorSetLayoutBinding {
+	pub binding: u32,
+	pub descriptor_type: VkDescriptorType,
+	pub descriptor_count: u32,
+	pub stage_flags: VkShaderStage,
+	pub immutable_samplers: *const VkSampler,
+}
+
+#[repr(C)] pub struct VkPipelineLayoutCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub set_layout_count: u32,
+	pub set_layouts: *const VkDescriptorSetLayout,
+	pub push_constant_range_count: u32,
+	pub push_constant_ranges: *const VkPushConstantRange,
+}
+
+#[repr(C)] pub struct VkGraphicsPipelineCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub stage_count: u32,
+	pub stages: *const VkPipelineShaderStageCreateInfo,
+	pub vertex_input_state: *const VkPipelineVertexInputStateCreateInfo,
+	pub input_assembly_state: *const VkPipelineInputAssemblyStateCreateInfo,
+	pub tessellation_state: *const VkPipelineTessellationStateCreateInfo,
+	pub viewport_state: *const VkPipelineViewportStateCreateInfo,
+	pub rasterization_state: *const VkPipelineRasterizationStateCreateInfo,
+	pub multisample_state: *const VkPipelineMultisampleStateCreateInfo,
+	pub depth_stencil_state: *const VkPipelineDepthStencilStateCreateInfo,
+	pub color_blend_state: *const VkPipelineColorBlendStateCreateInfo,
+	pub dynamic_state: *const VkPipelineDynamicStateCreateInfo,
+	pub layout: VkPipelineLayout,
+	pub render_pass: VkRenderPass,
+	pub subpass: u32,
+	pub base_pipeline_handle: VkPipeline,
+	pub base_pipeline_index: i32,
+}
+
+#[repr(C)] pub struct VkPipelineShaderStageCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub stage: VkShaderStage,
+	pub module: VkShaderModule,
+	pub name: *const u8,
+	pub specialization_info: *const Void,
+}
+
+#[repr(C)] pub struct VkPipelineVertexInputStateCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub vertex_binding_description_count: u32,
+	pub vertex_binding_descriptions: *const VkVertexInputBindingDescription,
+	pub vertex_attribute_description_count: u32,
+	pub vertex_attribute_descriptions: *const VkVertexInputAttributeDescription,
+}
+
+#[repr(C)] pub struct VkVertexInputBindingDescription {
+	pub binding: u32,
+	pub stride: u32,
+	pub input_rate: VkVertexInputRate,
+}
+
+#[repr(C)] pub struct VkVertexInputAttributeDescription {
+	pub location: u32,
+	pub binding: u32,
+	pub format: VkFormat,
+	pub offset: u32,
+}
+
+#[repr(C)] pub struct VkPipelineInputAssemblyStateCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub topology: VkPrimitiveTopology,
+	pub primitive_restart_enable: VkBool32,
+}
+
+#[repr(C)] pub struct VkPipelineViewportStateCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub viewport_count: u32,
+	pub viewports: *const VkViewport,
+	pub scissor_count: u32,
+	pub scissors: *const VkRect2D
+}
+
+#[repr(C)] pub struct VkViewport {
+	pub x: f32,
+	pub y: f32,
+	pub width: f32,
+	pub height: f32,
+	pub min_depth: f32,
+	pub max_depth: f32,
+}
+
+#[repr(C)] pub struct VkOffset2D {
+	pub x: i32,
+	pub y: i32,
+}
+
+#[repr(C)] pub struct VkRect2D {
+	pub offset: VkOffset2D,
+	pub extent: VkExtent2D,
+}
+
+#[repr(C)] pub struct VkPipelineRasterizationStateCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub depth_clamp_enable: VkBool32,
+	pub rasterizer_discard_enable: VkBool32,
+	pub polygon_mode: VkPolygonMode,
+	pub cull_mode: VkCullMode,
+	pub front_face: VkFrontFace,
+	pub depth_bias_enable: VkBool32,
+	pub depth_bias_constant_factor: f32,
+	pub depth_bias_clamp: f32,
+	pub depth_bias_slope_factor: f32,
+	pub line_width: f32,
+}
+
+#[repr(C)] pub struct VkPipelineMultisampleStateCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub rasterization_samples: VkSampleCount,
+	pub sample_shading_enable: VkBool32,
+	pub min_sample_shading: f32,
+	pub sample_mask: *const VkSampleMask,
+	pub alpha_to_coverage_enable: VkBool32,
+	pub alpha_to_one_enable: VkBool32,
+}
+
+#[repr(C)] pub struct VkPipelineDepthStencilStateCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub depth_test_enable: VkBool32,
+	pub depth_write_enable: VkBool32,
+	pub depth_compare_op: VkCompareOp,
+	pub depth_bounds_test_enable: VkBool32,
+	pub stencil_test_enable: VkBool32,
+	pub front: VkStencilOpState,
+	pub back: VkStencilOpState,
+	pub min_depth_bounds: f32,
+	pub max_depth_bounds: f32,
+}
+
+#[repr(C)] pub struct VkPipelineColorBlendStateCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub logic_op_enable: VkBool32,
+	pub logic_op: VkLogicOp,
+	pub attachment_count: u32,
+	pub attachments: *const VkPipelineColorBlendAttachmentState,
+	pub blend_constants: [f32; 4],
+}
+
+#[repr(C)] pub struct VkPipelineColorBlendAttachmentState {
+	pub blend_enable: VkBool32,
+	pub src_color_blend_factor: VkBlendFactor,
+	pub dst_color_blend_factor: VkBlendFactor,
+	pub color_blend_op: VkBlendOp,
+	pub src_alpha_blend_factor: VkBlendFactor,
+	pub dst_alpha_blend_factor: VkBlendFactor,
+	pub alpha_blend_op: VkBlendOp,
+	pub color_write_mask: VkFlags,
+}
+
+#[repr(C)] pub struct VkPipelineDynamicStateCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub dynamic_state_count: u32,
+	pub dynamic_states: *const VkDynamicState,
+}
+
+#[repr(C)] pub struct VkShaderModuleCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub code_size: usize,
+	pub code: *const u8, // Actually u32
+}
 
 #[repr(C)] pub struct VkDescriptorPoolCreateInfo {
 	pub s_type: VkStructureType,
@@ -357,6 +581,137 @@ pub type VkBool32 = u32;
 	pub pp_enabled_layer_names: *const *const i8,
 	pub enabled_extension_count: u32,
 	pub pp_enabled_extension_names: *const *const i8,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkStencilOp {
+	Keep = 0,
+	Zero = 1,
+	Replace = 2,
+	IncrementAndClamp = 3,
+	DecrementAndClamp = 4,
+	Invert = 5,
+	IncrementAndWrap = 6,
+	DecrementAndWrap = 7,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkShaderStage {
+	Vertex = 0x00000001,
+	TessellationControl = 0x00000002,
+	TessellationEvaluation = 0x00000004,
+	Geometry = 0x00000008,
+	Fragment = 0x00000010,
+	Compute = 0x00000020,
+	AllGraphics = 0x0000001f,
+	All = 0x7fffffff,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkVertexInputRate {
+	Vertex = 0,
+	Instance = 1,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkPrimitiveTopology {
+	PointList = 0,
+	LineList = 1,
+	LineStrip = 2,
+	TriangleList = 3,
+	TriangleStrip = 4,
+	TriangleFan = 5,
+	LineListWithAdjacency = 6,
+	LineStripWithAdjacency = 7,
+	TriangleListWithAdjacency = 8,
+	TriangleStripWithAdjacency = 9,
+	PatchList = 10,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkPolygonMode {
+	Fill = 0,
+	Line = 1,
+	Point = 2,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkCullMode {
+	None = 0,
+	Front = 0x00000001,
+	Back = 0x00000002,
+	FrontAndBack = 0x00000003,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkFrontFace {
+	CounterClockwise = 0,
+	Clockwise = 1,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkCompareOp {
+	Never = 0,
+	Less = 1,
+	Equal = 2,
+	LessOrEqual = 3,
+	Greater = 4,
+	NotEqual = 5,
+	GreaterOrEqual = 6,
+	Always = 7,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkLogicOp {
+	Clear = 0,
+	And = 1,
+	AndReverse = 2,
+	Copy = 3,
+	AndInverted = 4,
+	NoOp = 5,
+	Xor = 6,
+	Or = 7,
+	Nor = 8,
+	Equivalent = 9,
+	Invert = 10,
+	OrReverse = 11,
+	CopyInverted = 12,
+	OrInverted = 13,
+	Nand = 14,
+	Set = 15,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkBlendFactor {
+	Zero = 0,
+	One = 1,
+	SrcColor = 2,
+	OneMinusSrcColor = 3,
+	DstColor = 4,
+	OneMinusDstColor = 5,
+	SrcAlpha = 6,
+	OneMinusSrcAlpha = 7,
+	DstAlpha = 8,
+	OneMinusDstAlpha = 9,
+	ConstantColor = 10,
+	OneMinusConstantColor = 11,
+	ConstantAlpha = 12,
+	OneMinusConstantAlpha = 13,
+	SrcAlphaSaturate = 14,
+	Src1Color = 15,
+	OneMinusSrc1Color = 16,
+	Src1Alpha = 17,
+	OneMinusSrc1Alpha = 18,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkBlendOp {
+	Add = 0,
+	Subtract = 1,
+	Reverse_Subtract = 2,
+	Min = 3,
+	Max = 4,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkDynamicState {
+	Viewport = 0,
+	Scissor = 1,
+	LineWidth = 2,
+	DepthBias = 3,
+	BlendConstants = 4,
+	DepthBounds = 5,
+	StencilCompareMask = 6,
+	StencilWriteMask = 7,
+	StencilReference = 8,
 }
 
 #[repr(C)] #[allow(dead_code)] pub enum VkBufferUsage {
@@ -767,7 +1122,7 @@ pub enum VkPresentModeKHR {
 	PipelineCacheCreateInfo = 17,
 	PipelineShaderStageCreateInfo = 18,
 	PipelineVertexInputStateCreateInfo = 19,
-	PipelineInputAssemlyStateCreateInfo = 20,
+	PipelineInputAssemblyStateCreateInfo = 20,
 	PipelineTessellationStateCreateInfo = 21,
 	PipelineViewportStateCreateInfo = 22,
 	PipelineRasterizationStateCreateInfo = 23,
