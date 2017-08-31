@@ -1,7 +1,5 @@
-// Willow Graphics API
-//
-// Copyright 2017 (c) Aldaron's Tech
-// Copyright 2017 (c) Jeron Lau
+// Aldaron's Device Interface / GPU
+// Copyright (c) 2017 Plop Grizzly, Jeron Lau <jeron.lau@plopgrizzly.com>
 // Licensed under the MIT LICENSE
 //
 // src/renderer/ffi/vulkan/ffi/mod.rs
@@ -143,6 +141,20 @@ pub struct Connection {
 	new_descset_layout: unsafe extern "system" fn(VkDevice,
 		*const VkDescriptorSetLayoutCreateInfo, *const Void,
 		*mut VkDescriptorSetLayout) -> VkResult,
+	bind_vb: unsafe extern "system" fn(VkCommandBuffer, u32, u32,
+		*const VkBuffer, *const VkDeviceSize) -> (),
+	bind_pipeline: unsafe extern "system" fn(VkCommandBuffer,
+		VkPipelineBindPoint, VkPipeline) -> (),
+	bind_descsets: unsafe extern "system" fn(VkCommandBuffer,
+		VkPipelineBindPoint, VkPipelineLayout, u32, u32,
+		*const VkDescriptorSet, u32, *const u32) -> (),
+	new_semaphore: unsafe extern "system" fn(VkDevice,
+		*const VkSemaphoreCreateInfo, *const Void, *mut VkSemaphore)
+		-> VkResult,
+	drop_semaphore: unsafe extern "system" fn(VkDevice, VkSemaphore,
+		*const Void) -> (),
+	get_next_image: unsafe extern "system" fn(VkDevice, VkSwapchainKHR, u64,
+		VkSemaphore, VkFence, *mut u32) -> VkResult,
 }
 
 pub unsafe fn load(app_name: &str) -> Connection {
@@ -203,6 +215,12 @@ pub unsafe fn load(app_name: &str) -> Connection {
 			vk_sym(vk, vksym, b"vkCreatePipelineLayout\0"),
 		new_descset_layout:
 			vk_sym(vk, vksym, b"vkCreateDescriptorSetLayout\0"),
+		bind_vb: vk_sym(vk, vksym, b"vkCmdBindVertexBuffers\0"),
+		bind_pipeline: vk_sym(vk, vksym, b"vkCmdBindPipeline\0"),
+		bind_descsets: vk_sym(vk, vksym, b"vkCmdBindDescriptorSets\0"),
+		new_semaphore: vk_sym(vk, vksym, b"vkCreateSemaphore\0"),
+		drop_semaphore: vk_sym(vk, vksym, b"vkDestroySemaphore\0"),
+		get_next_image: vk_sym(vk, vksym, b"vkAcquireNextImageKHR\0"),
 	}
 }
 
@@ -212,6 +230,7 @@ unsafe fn dl_sym<T>(lib: *mut Void, name: &[u8]) -> T {
 	mem::transmute_copy::<*mut Void, T>(&fn_ptr)
 }
 
+#[inline(always)]
 unsafe fn vk_sym<T>(vk: VkInstance, vksym: unsafe extern "system" fn(
 	VkInstance, *const i8) -> *mut Void, name: &[u8]) -> T
 {
@@ -593,12 +612,117 @@ pub unsafe fn get_memory_type(connection: &Connection, gpu: VkPhysicalDevice,
 		"Couldn't find suitable memory type."))
 }
 
+pub unsafe fn cmd_bind_descsets(connection: &Connection,
+	cmd_buf: VkCommandBuffer, pipeline_layout: VkPipelineLayout,
+	desc_set: VkDescriptorSet)
+{
+	(connection.bind_descsets)(
+		cmd_buf,
+		VkPipelineBindPoint::Graphics,
+		pipeline_layout,
+		0,
+		1,
+		[desc_set].as_ptr(),
+		0,
+		ptr::null(),
+	);
+}
+
+pub unsafe fn cmd_bind_pipeline(connection: &Connection,
+	cmd_buf: VkCommandBuffer, pipeline: VkPipeline)
+{
+	(connection.bind_pipeline)(
+		cmd_buf,
+		VkPipelineBindPoint::Graphics,
+		pipeline
+	);
+}
+
+pub unsafe fn cmd_bind_vb(connection: &Connection, cmd_buf: VkCommandBuffer,
+	vertex_buffer: VkBuffer)
+{
+	(connection.bind_vb)(
+		cmd_buf,
+		0,
+		1,
+		[vertex_buffer].as_ptr(),
+		[0].as_ptr(),
+	);
+}
+
 pub unsafe fn cmd_draw(connection: &Connection, cmd_buf: VkCommandBuffer,
 	nvertices: u32, ninstances: u32, firstvertex: u32, firstinstance: u32)
 	-> ()
 {
 	(connection.draw)(cmd_buf, nvertices, ninstances, firstvertex,
 		firstinstance);
+}
+
+pub unsafe fn new_semaphore(connection: &Connection, device: VkDevice)
+	-> VkSemaphore
+{
+	let mut semaphore = mem::uninitialized();
+
+	(connection.new_semaphore)(
+		device,
+		&VkSemaphoreCreateInfo {
+			s_type: VkStructureType::SemaphoreCreateInfo,
+			next: ptr::null(),
+			flags: 0,
+		},
+		ptr::null(),
+		&mut semaphore,
+	);
+
+	semaphore
+}
+
+pub unsafe fn drop_semaphore(connection: &Connection, device: VkDevice,
+	semaphore: VkSemaphore) -> ()
+{
+	(connection.drop_semaphore)(
+		device,
+		semaphore,
+		ptr::null(),
+	);
+}
+
+pub unsafe fn get_next_image(connection: &Connection, device: VkDevice,
+	presenting_complete_sem: &mut VkSemaphore, swapchain: VkSwapchainKHR)
+	-> u32
+{
+	let mut image_id = mem::uninitialized();
+
+	let result = (connection.get_next_image)(
+		device,
+		swapchain,
+		u64::MAX,
+		*presenting_complete_sem,
+		mem::zeroed(),
+		&mut image_id,
+	);
+
+	if result == VkResult::OutOfDateKhr {
+		drop_semaphore(connection, device, *presenting_complete_sem);
+		*presenting_complete_sem = new_semaphore(connection, device);
+
+		let result = (connection.get_next_image)(
+			device,
+			swapchain,
+			u64::MAX,
+			*presenting_complete_sem,
+			mem::zeroed(),
+			&mut image_id,
+		);
+
+		if result != VkResult::Success {
+			panic!("vkAcquireNextImageKHR Failed!");
+		}
+	} else if result != VkResult::Success {
+		panic!("vkAcquireNextImageKHR Failed!");
+	}
+
+	image_id
 }
 
 pub unsafe fn get_color_format(connection: &Connection, gpu: VkPhysicalDevice,

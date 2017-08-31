@@ -1,38 +1,49 @@
+# Aldaron's Device Interface / GPU                                             #
+# Copyright (c) 2017 Plop Grizzly, Jeron Lau <jeron.lau@plopgrizzly.com>       #
+# Licensed under the MIT LICENSE                                               #
+#                             _        _                                       #
+#                            /@\——————/@\                                      #
+# .———  .                   |   o    o   |     .————      .            .       #
+# |   | |  .———   .———   .——.     []     .——.  |      .——    ———: ———: | .   . #
+# |   | |  |   |  |   |  \   \   <##>   /   /  |      |   |    /    /  | |   | #
+# |———  |  |   |  |   |   |   ¯        ¯   |   |   -- |   |   /    /   |  \ /  #
+# |     |  |   |  |———    |                |   |    | |   |  /    /    |   |   #
+# |     |   ———   |       |                |    ————  |   | :——— :———  |   |   #
+#                 |        \              /                              __/   #
+#                           ¯————————————¯                                     #
+# Cargo.toml                                                                   #
+
+################################################################################
+
 [package]
 name = "adi_gpu"
 version = "0.1.0"
 authors = ["Jeron Aldaron Lau <jeron.lau@plopgrizzly.tech>"]
 
+################################################################################
+
 license = "MIT"
-documentation = "https://docs.rs/adi_gpu/"
-homepage = "https://docs.rs/crate/adi_gpu/"
-repository = "https://github.com/aldarons-tech/adi_gpu"
+documentation = "https://docs.rs/adi_gpu"
+homepage = "http://plopgrizzly.com/adi_gpu"
+repository = "https://github.com/plopgrizzly/adi_gpu"
+
+################################################################################
+
 readme = "README.md"
-
-keywords = [
-	"vulkan", "graphics", "rendering", "opengl", "gpu"
-]
-
-categories = [
-	"rendering::graphics-api", "hardware-support",
-	"rendering::engine", "rendering", "no-std"
-]
-
 description = """
-
-Aldaron's Device Interface - Graphical Processing Unit, or adi_gpu for short, is
-a library for interfacing with a gpu.  You can use it to render graphics onto a
-surface.  Combined with awi, you can render to a window ( this is made easy with
-adi_screen ).
-
+    Aldaron's Device Interface / GPU is a library developed by Plop Grizzly for
+    interfacing with the GPU to render graphics or do fast calculations.
 """
+keywords = ["vulkan", "graphics", "rendering", "opengl", "gpu"]
+categories = ["rendering::graphics-api", "hardware-support",
+	"rendering::engine", "rendering", "no-std"]
 
-exclude = [
-	"examples/*", "build-vulkan-shaders.sh", "CODE_OF_CONDUCT.md",
-	"CONTRIBUTING.md", ".gitignore"
-]
+################################################################################
 
+exclude = ["examples/*", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", ".gitignore"]
 build = "build.rs"
+
+################################################################################
 
 [dependencies]
 ami = "^0.4"
@@ -41,9 +52,8 @@ awi = { path = "../awi" }
 [build-dependencies.gcc]
 version = "0.3.50"
 
-[dev-dependencies]
-aci_png = "^0.2"
-
 [features]
 checks = []
 validation = []
+
+################################################################################

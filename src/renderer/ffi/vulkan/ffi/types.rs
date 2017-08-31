@@ -1,7 +1,5 @@
-// Willow Graphics API
-//
-// Copyright 2017 (c) Aldaron's Tech
-// Copyright 2017 (c) Jeron Lau
+// Aldaron's Device Interface / GPU
+// Copyright (c) 2017 Plop Grizzly, Jeron Lau <jeron.lau@plopgrizzly.com>
 // Licensed under the MIT LICENSE
 //
 // src/renderer/ffi/vulkan/ffi/types.rs
@@ -40,6 +38,12 @@ pub type VkSampleMask = u32;
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkInstance(*mut Void);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkCommandBuffer(*mut Void);
 #[repr(C)] #[derive(Copy, Clone)] pub struct VkQueue(*mut Void);
+
+#[repr(C)] pub struct VkSemaphoreCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+}
 
 #[repr(C)] pub struct VkPushConstantRange {
 	pub stage_flags: VkShaderStage,
@@ -1159,7 +1163,7 @@ pub enum VkPresentModeKHR {
 	SurfaceCreateInfo = 1000008000, // Android
 }
 
-#[repr(C)] #[allow(dead_code)] pub enum VkResult {
+#[repr(C)] #[allow(dead_code)] #[derive(PartialEq)] pub enum VkResult {
 	Success = 0,
 	NotReady = 1,
 	Timeout = 2,
@@ -1179,6 +1183,13 @@ pub enum VkPresentModeKHR {
 	BadFormat = -11,
 	FragmentedPool = -12,
 	Other = -1024,
+	SurfaceLostKhr = -1000000000,
+	NativeWindowInUseKhr = -1000000001,
+	SuboptimalKhr = 1000001003,
+	OutOfDateKhr = -1000001004,
+	IncompatibleDisplayKhr = -1000003001,
+	OutOfPoolMemoryKhr = -1000069000,
+	InvalidExternalHandleKhr = -1000072003,
 }
 
 // // //

@@ -373,13 +373,11 @@ vw_texture_t vw_vulkan_texture(vw_t* vulkan, uint32_t w, uint32_t h,
 }
 
 void vw_vulkan_draw_begin(vw_t* vulkan, float r, float g, float b) {
-	VkSemaphoreCreateInfo semaphore_ci = {
+	/*VkSemaphoreCreateInfo semaphore_ci = {
 		VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, 0, 0
 	};
 	vkCreateSemaphore(vulkan->device, &semaphore_ci, NULL,
 		&vulkan->presenting_complete_sem);
-	vkCreateSemaphore(vulkan->device, &semaphore_ci, NULL,
-		&vulkan->rendering_complete_sem);
 
 	VkResult result = vkAcquireNextImageKHR(
 		vulkan->device, vulkan->swapchain, UINT64_MAX,
@@ -389,13 +387,9 @@ void vw_vulkan_draw_begin(vw_t* vulkan, float r, float g, float b) {
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 		vkDestroySemaphore(vulkan->device,
 			vulkan->presenting_complete_sem, NULL);
-		vkDestroySemaphore(vulkan->device,
-			vulkan->rendering_complete_sem, NULL);
 
 		vkCreateSemaphore(vulkan->device, &semaphore_ci, NULL,
 			&vulkan->presenting_complete_sem);
-		vkCreateSemaphore(vulkan->device, &semaphore_ci, NULL,
-			&vulkan->rendering_complete_sem);
 
 		if( vkAcquireNextImageKHR(
 			vulkan->device, vulkan->swapchain, UINT64_MAX,
@@ -409,6 +403,9 @@ void vw_vulkan_draw_begin(vw_t* vulkan, float r, float g, float b) {
 		printf("vkAcquireNextImageKHR Failed %d!\n", result);
 		exit(-1);
 	}
+
+	vkCreateSemaphore(vulkan->device, &semaphore_ci, NULL,
+		&vulkan->rendering_complete_sem);*/
 
 	VkCommandBufferBeginInfo beginInfo = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -466,21 +463,6 @@ void vw_vulkan_draw_begin(vw_t* vulkan, float r, float g, float b) {
 		.offset = { 0, 0 }, .extent = { vulkan->width, vulkan->height },
 	};
 	vkCmdSetScissor(vulkan->command_buffer, 0, 1, &scissor);
-}
-
-void vw_vulkan_draw_shape(vw_t* vulkan, vw_shape_t* shape,
-	vw_instance_t instance)
-{
-	vulkan->offset = 0;
-	vkCmdBindVertexBuffers(vulkan->command_buffer, 0, 1,
-		&shape->vertex_input_buffer, &vulkan->offset);
-	// Bind pipeline.
-	vkCmdBindPipeline(vulkan->command_buffer,
-		VK_PIPELINE_BIND_POINT_GRAPHICS, instance.pipeline.pipeline);
-	vkCmdBindDescriptorSets(vulkan->command_buffer,
-		VK_PIPELINE_BIND_POINT_GRAPHICS,
-		instance.pipeline.pipeline_layout, 0, 1, &instance.desc_set, 0,
-		NULL);
 }
 
 void vw_vulkan_draw_update(vw_t* vulkan) {

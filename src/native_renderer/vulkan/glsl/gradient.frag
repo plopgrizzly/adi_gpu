@@ -1,7 +1,5 @@
-// Willow Graphics API
-//
-// Copyright 2017 (c) Aldaron's Tech
-// Copyright 2017 (c) Jeron Lau
+// Aldaron's Device Interface / GPU
+// Copyright (c) 2017 Plop Grizzly, Jeron Lau <jeron.lau@plopgrizzly.com>
 // Licensed under the MIT LICENSE
 //
 // src/native_renderer/vulkan/glsl/gradient.frag

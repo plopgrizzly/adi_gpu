@@ -1,7 +1,5 @@
-// Willow Graphics API
-//
-// Copyright 2017 (c) Aldaron's Tech
-// Copyright 2017 (c) Jeron Lau
+// Aldaron's Device Interface / GPU
+// Copyright (c) 2017 Plop Grizzly, Jeron Lau <jeron.lau@plopgrizzly.com>
 // Licensed under the MIT LICENSE
 //
 // src/renderer/mod.rs
@@ -241,7 +239,7 @@ extern {
 // TODO: In Rust
 //	fn vw_vulkan_uniforms(a: *const Vw, b: Style,
 //		c: *const NativeTexture, d: u8) -> VwInstance;
-	fn vw_vulkan_draw_shape(v: *mut Vw, s: *const VwShape, f: VwInstance)
+	fn vw_vulkan_draw_shape(v: *mut Vw, f: VwInstance)
 		-> ();
 	fn vw_vulkan_draw_update(v: *mut Vw) -> ();
 	
@@ -465,15 +463,44 @@ impl Renderer {
 
 	pub fn update(&mut self) {
 //		let color = self.color;
+//		let presenting_finish_sem;
+//		let rendering_finish_sem;
 
 		unsafe {
+			self.vw.presenting_complete_sem = vulkan::ffi::new_semaphore(
+				&self.connection,
+				self.vw.device,
+			);
+
+			self.vw.next_image_index = vulkan::ffi::get_next_image(
+				&self.connection,
+				self.vw.device,
+				&mut self.vw.presenting_complete_sem,
+				self.vw.swapchain,
+			);
+
+			self.vw.rendering_complete_sem = vulkan::ffi::new_semaphore(
+				&self.connection,
+				self.vw.device,
+			);
+
 			vw_vulkan_draw_begin(&mut self.vw, 0.0, 0.0, 1.0);
 		}
 
 		for shape in &self.shapes {
 			unsafe {
-				vw_vulkan_draw_shape(&mut self.vw, &shape.shape,
-					shape.instance);
+				vulkan::ffi::cmd_bind_vb(&self.connection,
+					self.vw.command_buffer,
+					shape.shape.vertex_input_buffer);
+
+				vulkan::ffi::cmd_bind_pipeline(&self.connection,
+					self.vw.command_buffer,
+					shape.instance.pipeline.pipeline);
+
+				vulkan::ffi::cmd_bind_descsets(&self.connection,
+					self.vw.command_buffer,
+					shape.instance.pipeline.pipeline_layout,
+					shape.instance.desc_set);
 			}
 
 			vulkan::cmd_draw(&self.connection,
