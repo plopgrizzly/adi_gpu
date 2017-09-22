@@ -84,6 +84,7 @@ pub mod input {
 }
 
 pub use render_ops::RenderOps;
+pub use renderer::Texture;
 
 /// To render anything with The Willow Graphics API, you have to make a
 /// `Display`
@@ -126,6 +127,12 @@ impl Display {
 				0
 			},
 		}
+	}
+
+	/// Push a texture into GPU memory.
+	pub fn push_texture(&mut self, image_data: &[u32]) -> Texture {
+		self.renderer.texture(image_data[0], image_data[1],
+			&image_data[2..])
 	}
 
 	/// Update the display / window.

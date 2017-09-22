@@ -174,7 +174,7 @@ float* test_map(VkDevice device, VkDeviceMemory vertex_buffer_memory, uint64_t w
 	return mapped;
 }
 
-void vw_vulkan_animate(vw_t* vulkan, vw_texture_t* tx, uint32_t w, uint32_t h,
+/*void vw_vulkan_animate(vw_t* vulkan, vw_texture_t* tx, uint32_t w, uint32_t h,
 	const uint8_t* p)
 {
 	void *data;
@@ -198,10 +198,6 @@ void vw_vulkan_animate(vw_t* vulkan, vw_texture_t* tx, uint32_t w, uint32_t h,
 		tx->memory = tx->mappable_memory;
 	} else {
 		// Use optimal tiled image - create from linear tiled image
-		VkMemoryRequirements mem_reqs;
-		vkGetImageMemoryRequirements(vulkan->device, 0,
-			&mem_reqs);
-
 		VkImageCopy copy_region = {
 			.srcSubresource = {
 				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -225,9 +221,9 @@ void vw_vulkan_animate(vw_t* vulkan, vw_texture_t* tx, uint32_t w, uint32_t h,
 			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, tx->image,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
 	}
-}
+}*/
 
-vw_texture_t vw_vulkan_texture(vw_t* vulkan, uint32_t w, uint32_t h,
+/*vw_texture_t vw_vulkan_texture(vw_t* vulkan, uint32_t w, uint32_t h,
 	const uint8_t* p)
 {
 	vw_texture_t texture;
@@ -288,7 +284,7 @@ vw_texture_t vw_vulkan_texture(vw_t* vulkan, uint32_t w, uint32_t h,
 	vkGetImageSubresourceLayout(vulkan->device, texture.mappable_image,
 		&subres, &layout);
 
-	texture.size = mem_reqs.size;
+//	texture.size = mem_reqs.size;
 	texture.pitch = layout.rowPitch;
 
 	const VkImageCreateInfo image_create_2info = {
@@ -370,7 +366,7 @@ vw_texture_t vw_vulkan_texture(vw_t* vulkan, uint32_t w, uint32_t h,
 	vw_vulkan_error("create image view", vkCreateImageView(vulkan->device,
 		&view_info, NULL, &texture.view));
 	return texture;
-}
+}*/
 
 void vw_vulkan_draw_begin(vw_t* vulkan, float r, float g, float b) {
 	/*VkSemaphoreCreateInfo semaphore_ci = {
@@ -430,7 +426,7 @@ void vw_vulkan_draw_begin(vw_t* vulkan, float r, float g, float b) {
 
 	vkCmdPipelineBarrier(vulkan->command_buffer,
 		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 
-		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 
 		0, 0, NULL, 0, NULL, 1, &layoutTransitionBarrier);
 
 	// activate render pass:

@@ -35,6 +35,7 @@ typedef struct {
 	VkSemaphore presenting_complete_sem, rendering_complete_sem;
 	VkDeviceSize offset;
 	VkPresentModeKHR present_mode;
+	uint8_t sampled;
 } vw_t;
 
 typedef struct {
@@ -72,7 +73,6 @@ typedef struct {
 	VkSampler sampler;
 	VkImageView view;
 	uint32_t w, h;
-	uint32_t size;
 	uint32_t pitch;
 	uint8_t staged;
 } vw_texture_t;

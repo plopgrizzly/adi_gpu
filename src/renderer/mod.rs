@@ -45,6 +45,7 @@ pub struct Vw {
 	rendering_complete_sem: VkSemaphore,
 	offsets: u64, // VkDeviceSize
 	present_mode: VkPresentModeKHR,
+	sampled: bool,
 }
 
 #[repr(C)]
@@ -82,7 +83,7 @@ pub struct Style {
 
 #[repr(C)]
 #[derive(Copy,Clone)]
-pub struct NativeTexture {
+pub struct Texture {
 	mappable_image: VkImage,
 	mappable_memory: VkDeviceMemory,
 	image: VkImage,
@@ -91,9 +92,8 @@ pub struct NativeTexture {
 	view: VkImageView,
 	w: u32,
 	h: u32,
-	size: u32,
 	pitch: u32,
-	staged: u8,
+	staged: bool,
 }
 
 #[repr(C)]
@@ -329,6 +329,81 @@ fn swapchain_delete(connection: &Connection, vw: &mut Vw) {
 	}
 }
 
+fn new_texture(connection: &Connection, vw: &mut Vw, width: u32, height: u32)
+	-> Texture
+{
+//	let mut format_props = unsafe { mem::uninitialized() };
+	let staged = !vw.sampled;
+
+	let (mappable_image, mappable_memory) = unsafe {
+		vulkan::ffi::create_image(
+			connection, vw.device, vw.gpu, width, height,
+			VkFormat::B8g8r8a8Srgb, VkImageTiling::Linear,
+			if staged { VkImageUsage::TransferSrcBit }
+				else { VkImageUsage::SampledBit },
+			VkImageLayout::Preinitialized,
+			0x00000006 /* visible|coherent */
+		)
+	};
+
+	let layout = unsafe {
+		vulkan::ffi::subres_layout(connection, vw.device,
+			mappable_image)
+	};
+
+	let pitch = layout.row_pitch;
+
+	let (image, memory) = if staged {
+		unsafe {
+			vulkan::ffi::create_image(
+				connection, vw.device, vw.gpu, width, height,
+				VkFormat::B8g8r8a8Srgb, VkImageTiling::Optimal,
+				VkImageUsage::TransferDstAndUsage,
+				VkImageLayout::Undefined, 0)
+		}
+	} else {
+		(mappable_image, mappable_memory)
+	};
+//
+	let sampler = unsafe { vulkan::ffi::new_sampler(connection, vw.device) };
+
+	let view = unsafe {
+		vulkan::ffi::create_imgview(connection, vw.device, image,
+			VkFormat::B8g8r8a8Srgb, true)
+	};
+//
+	Texture {
+		staged, mappable_image, mappable_memory, image, memory, view,
+		pitch: pitch as u32, sampler, w: width, h: height,
+	}
+}
+
+fn set_texture(connection: &Connection, vw: &mut Vw, texture: &mut Texture,
+	rgba: &[u32])
+{
+	if texture.pitch != 4 {
+		panic!("Texture requested not to be packed!");
+	}
+
+	vulkan::copy_memory(connection, vw.device, texture.memory, rgba);
+
+	if texture.staged {
+		// Use optimal tiled image - create from linear tiled image
+
+		// Copy data from linear image to optimal image.
+		unsafe {
+			vulkan::ffi::copy_image(connection,
+				vw.command_buffer, texture.mappable_image,
+				texture.image, texture.w, texture.h
+			);
+		}
+	} else {
+		// Use a linear tiled image for the texture, is supported
+		texture.image = texture.mappable_image;
+		texture.memory = texture.mappable_memory;
+	}
+}
+
 /*pub fn make_styles(vw: &mut Vw, extrashaders: &[Shader], shaders: &mut Vec<Style>)
 {
 	let mut shadev = Vec::new();
@@ -355,7 +430,7 @@ impl Vw {
 		let surface = vulkan::create_surface::create_surface(	
 			instance, window_connection);
 
-		let (gpu, pqi) = unsafe {
+		let (gpu, pqi, sampled) = unsafe {
 			vulkan::ffi::get_gpu(&connection.0, instance, surface)
 		};
 		let device = unsafe {
@@ -400,7 +475,8 @@ impl Vw {
 			presenting_complete_sem: unsafe { mem::uninitialized() },
 			rendering_complete_sem: unsafe { mem::uninitialized() },
 			offsets: 0,
-			present_mode
+			present_mode,
+			sampled,
 		};
 
 		swapchain_resize(&connection.0, &mut vw);
@@ -522,6 +598,17 @@ impl Renderer {
 
 		self.shapes.clear();
 		self.projection = projection(size.1 as f32/size.0 as f32, 90.0);
+	}
+
+	pub fn texture(&mut self, width: u32, height: u32, rgba: &[u32])
+		-> Texture
+	{
+		let mut texture = new_texture(&self.connection, &mut self.vw,
+			width, height);
+
+		set_texture(&self.connection, &mut self.vw, &mut texture, rgba);
+
+		texture
 	}
 
 	pub fn solid(&mut self, vertices: Vec<f32>, color: ::Color) -> usize {

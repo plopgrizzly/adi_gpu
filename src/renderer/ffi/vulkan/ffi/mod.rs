@@ -46,7 +46,7 @@ pub struct Connection {
 	vksym: unsafe extern "system" fn(VkInstance, *const i8) -> *mut Void,
 	vkdsym: unsafe extern "system" fn(VkDevice, *const i8) -> *mut Void,
 	mapmem: unsafe extern "system" fn(VkDevice, VkDeviceMemory,
-		VkDeviceSize, VkDeviceSize, VkFlags, *mut *mut f32)
+		VkDeviceSize, VkDeviceSize, VkFlags, *mut *mut Void)
 		-> VkResult,
 	draw: unsafe extern "system" fn(VkCommandBuffer, u32, u32, u32, u32)
 		-> (),
@@ -155,6 +155,16 @@ pub struct Connection {
 		*const Void) -> (),
 	get_next_image: unsafe extern "system" fn(VkDevice, VkSwapchainKHR, u64,
 		VkSemaphore, VkFence, *mut u32) -> VkResult,
+	copy_image: unsafe extern "system" fn(VkCommandBuffer, VkImage,
+		VkImageLayout, VkImage, VkImageLayout, u32, *const VkImageCopy)
+		-> (),
+	gpu_props: unsafe extern "system" fn(VkPhysicalDevice, VkFormat,
+		*mut VkFormatProperties) -> (),
+	subres_layout: unsafe extern "system" fn(VkDevice, VkImage,
+		*const VkImageSubresource, *mut VkSubresourceLayout) -> (),
+	new_sampler: unsafe extern "system" fn(VkDevice,
+		*const VkSamplerCreateInfo, *const Void, *mut VkSampler)
+		-> VkResult,
 }
 
 pub unsafe fn load(app_name: &str) -> Connection {
@@ -221,6 +231,12 @@ pub unsafe fn load(app_name: &str) -> Connection {
 		new_semaphore: vk_sym(vk, vksym, b"vkCreateSemaphore\0"),
 		drop_semaphore: vk_sym(vk, vksym, b"vkDestroySemaphore\0"),
 		get_next_image: vk_sym(vk, vksym, b"vkAcquireNextImageKHR\0"),
+		copy_image: vk_sym(vk, vksym, b"vkCmdCopyImage\0"),
+		gpu_props: vk_sym(vk, vksym,
+			b"vkGetPhysicalDeviceFormatProperties\0"),
+		subres_layout:
+			vk_sym(vk, vksym, b"vkGetImageSubresourceLayout\0"),
+		new_sampler: vk_sym(vk, vksym, b"vkCreateSampler\0"),
 	}
 }
 
@@ -334,7 +350,7 @@ unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
 }
 
 pub unsafe fn get_gpu(connection: &Connection, instance: VkInstance,
-	surface: VkSurfaceKHR) -> (VkPhysicalDevice, u32)
+	surface: VkSurfaceKHR) -> (VkPhysicalDevice, u32, bool)
 {
 	#[repr(C)]
 	struct VkQueueFamilyProperties {
@@ -398,7 +414,15 @@ pub unsafe fn get_gpu(connection: &Connection, instance: VkInstance,
 			if supports_present != 0 &&
 				(properties[j].queue_flags & 0x00000001) != 0
 			{
-				return (gpus[i], k);
+				// 
+				let mut props = mem::uninitialized();
+
+				(connection.gpu_props)(gpus[i],
+					VkFormat::R8g8b8a8Unorm, &mut props);
+
+				return (gpus[i], k,
+					props.linear_tiling_features &
+					0x00000001 /* sampled image bit */ != 0);
 			}
 		}
 	}
@@ -572,12 +596,66 @@ pub unsafe fn create_command_buffer(connection: &Connection, device: VkDevice,
 	(command_buffer, command_pool)
 }
 
-pub unsafe fn map_memory(connection: &Connection, device: VkDevice,
-	vb_memory: VkDeviceMemory, size: u64) -> *mut f32
+pub unsafe fn new_sampler(connection: &Connection, device: VkDevice)
+	-> VkSampler
+{
+	let mut sampler = mem::uninitialized();
+
+	(connection.new_sampler)(
+		device,
+		&VkSamplerCreateInfo {
+			s_type: VkStructureType::SamplerCreateInfo,
+			next: ptr::null(),
+			flags: 0,
+			mag_filter: VkFilter::Nearest,
+			min_filter: VkFilter::Nearest,
+			mipmap_mode: VkSamplerMipmapMode::Nearest,
+			address_mode_u: VkSamplerAddressMode::ClampToEdge,
+			address_mode_v: VkSamplerAddressMode::ClampToEdge,
+			address_mode_w: VkSamplerAddressMode::ClampToEdge,
+			mip_lod_bias: 0.0,
+			anisotropy_enable: 0,
+			max_anisotropy: 0.0,
+			compare_enable: 0,
+			compare_op: VkCompareOp::Never,
+			min_lod: 0.0,
+			max_lod: 0.0,
+			border_color: VkBorderColor::FloatOpaqueWhite,
+			unnormalized_coordinates: 0,
+		},
+		ptr::null(),
+		&mut sampler
+	);
+
+	sampler
+}
+
+pub unsafe fn subres_layout(connection: &Connection, device: VkDevice,
+	image: VkImage) -> VkSubresourceLayout
+{
+	let mut layout = mem::uninitialized();
+
+	(connection.subres_layout)(
+		device,
+		image,
+		&VkImageSubresource {
+			aspect_mask: VkImageAspectFlags::Color,
+			mip_level: 0,
+			array_layer: 0,
+		},
+		&mut layout
+	);
+
+	layout
+}
+
+pub unsafe fn map_memory<T>(connection: &Connection, device: VkDevice,
+	vb_memory: VkDeviceMemory, size: u64) -> *mut T
 {
 	let mut mapped = mem::uninitialized();
 
-	(connection.mapmem)(device, vb_memory, 0, size, 0, &mut mapped);
+	(connection.mapmem)(device, vb_memory, 0, size, 0,
+		&mut mapped as *mut *mut _ as *mut *mut Void);
 
 	mapped
 }
@@ -829,6 +907,33 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	VkPresentModeKHR::Fifo
 }
 
+#[inline(always)] pub(in renderer) unsafe fn copy_image(connection: &Connection,
+	cmd_buff: VkCommandBuffer, src_image: VkImage, dst_image: VkImage,
+	width: u32, height: u32)
+{
+	(connection.copy_image)(
+		cmd_buff, src_image, VkImageLayout::TransferSrcOptimal,
+		dst_image, VkImageLayout::TransferDstOptimal, 1,
+		&VkImageCopy {
+			src_subresource: VkImageSubresourceLayers {
+				aspect_mask: VkImageAspectFlags::Color,
+				mip_level: 0,
+				base_array_layer: 0,
+				layer_count: 1,
+			},
+			src_offset: VkOffset3D { x: 0, y: 0, z: 0 },
+			dst_subresource: VkImageSubresourceLayers {
+				aspect_mask: VkImageAspectFlags::Color,
+				mip_level: 0,
+				base_array_layer: 0,
+				layer_count: 1,
+			},
+			dst_offset: VkOffset3D { x: 0, y: 0, z: 0 },
+			extent: VkExtent3D { width, height, depth: 1 },
+		}
+	);
+}
+
 #[inline(always)] pub(in renderer) unsafe fn create_swapchain(
 	connection: &Connection, surface: VkSurfaceKHR, device: VkDevice,
 	swapchain: &mut VkSwapchainKHR, width: u32, height: u32,
@@ -862,9 +967,62 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	);
 
 	(connection.get_swapcount)(device, *swapchain, image_count,
-		ptr::null_mut());
+		ptr::null_mut()).unwrap();
 	(connection.get_swapcount)(device, *swapchain, image_count,
-		swap_images);
+		swap_images).unwrap();
+}
+
+#[inline(always)] pub(in renderer) unsafe fn create_imgview(
+	connection: &Connection, device: VkDevice, image: VkImage,
+	format: VkFormat, has_color: bool) -> VkImageView
+{
+	let mut image_view = mem::uninitialized();
+
+	let (components, aspect_mask) = if has_color {
+		(
+			VkComponentMapping {
+				r: VkComponentSwizzle::R,
+				g: VkComponentSwizzle::G,
+				b: VkComponentSwizzle::B,
+				a: VkComponentSwizzle::A,
+			},
+			VkImageAspectFlags::Color
+		)
+	} else {
+		(
+			VkComponentMapping {
+				r: VkComponentSwizzle::Identity,
+				g: VkComponentSwizzle::Identity,
+				b: VkComponentSwizzle::Identity,
+				a: VkComponentSwizzle::Identity,
+			},
+			VkImageAspectFlags::Depth
+		)
+	};
+
+	(connection.create_imgview)(
+		device,
+		&VkImageViewCreateInfo {
+			s_type: VkStructureType::ImageViewCreateInfo,
+			p_next: ptr::null(),
+			flags: 0,
+			view_type: VkImageViewType::SingleLayer2d,
+			format: format.clone(),
+			components,
+			subresource_range: VkImageSubresourceRange {
+				aspect_mask,
+				base_mip_level: 0,
+				level_count: 1,
+				base_array_layer: 0,
+				layer_count: 1,
+			},
+			image,
+		},
+		ptr::null(),
+		&mut image_view
+	).unwrap();
+
+	image_view
 }
 
 #[inline(always)] pub(in renderer) unsafe fn create_image_view(
@@ -882,7 +1040,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 		},
 		ptr::null(),
 		submit_fence
-	);
+	).unwrap();
 
 	for i in 0..(image_count as usize) {
 		(connection.begin_cmdbuff)(
@@ -893,7 +1051,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 				flags: VkCommandBufferUsage::OneTimeSubmitBit,
 				p_inheritance_info: ptr::null(),
 			}
-		);
+		).unwrap();
 
 		(connection.pipeline_barrier)(
 			command_buffer,
@@ -920,7 +1078,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 			}
 		);
 
-		(connection.end_cmdbuff)(command_buffer);
+		(connection.end_cmdbuff)(command_buffer).unwrap();
 
 		(connection.queue_submit)(
 			present_queue,
@@ -938,49 +1096,25 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 				p_signal_semaphores: ptr::null(),
 			},
 			*submit_fence
-		);
+		).unwrap();
 
-		(connection.wait_fence)(device, 1, submit_fence, 1, u64::MAX);
-		(connection.reset_fence)(device, 1, submit_fence);
+		(connection.wait_fence)(device, 1, submit_fence, 1, u64::MAX)
+			.unwrap();
+		(connection.reset_fence)(device, 1, submit_fence).unwrap();
 		(connection.reset_cmdbuff)(command_buffer, 0);
 
-		(connection.create_imgview)(
-			device,
-			&VkImageViewCreateInfo {
-				s_type: VkStructureType::ImageViewCreateInfo,
-				p_next: ptr::null(),
-				flags: 0,
-				view_type: VkImageViewType::SingleLayer2d,
-				format: color_format.clone(),
-				components: VkComponentMapping {
-					r: VkComponentSwizzle::R,
-					g: VkComponentSwizzle::G,
-					b: VkComponentSwizzle::B,
-					a: VkComponentSwizzle::A,
-				},
-				subresource_range: VkImageSubresourceRange {
-					aspect_mask: VkImageAspectFlags::Color,
-					base_mip_level: 0,
-					level_count: 1,
-					base_array_layer: 0,
-					layer_count: 1,
-				},
-				image: swap_images[i],
-			},
-			ptr::null(),
-			&mut image_views[i]
-		);
+		image_views[i] = create_imgview(connection, device,
+			swap_images[i], color_format.clone(), true);
 	}
 }
 
-#[inline(always)] pub(in renderer) unsafe fn create_depth_buffer(
+#[inline(always)] pub(in renderer) unsafe fn create_image(
 	connection: &Connection, device: VkDevice, gpu: VkPhysicalDevice,
-	command_buffer: VkCommandBuffer, submit_fence: VkFence,
-	present_queue: VkQueue, width: u32, height: u32)
-	-> (VkImage, VkImageView, VkDeviceMemory)
+	width: u32, height: u32, format: VkFormat, tiling: VkImageTiling,
+	usage: VkImageUsage, initial_layout: VkImageLayout, reqs_mask: VkFlags)
+	-> (VkImage, VkDeviceMemory)
 {
 	let mut image = mem::uninitialized();
-	let mut image_view = mem::uninitialized();
 	let mut image_memory = mem::uninitialized();
 
 	let mut memory_reqs = mem::uninitialized();
@@ -992,7 +1126,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 			p_next: ptr::null(),
 			flags: 0,
 			image_type: VkImageType::Dim2d,
-			format: VkFormat::D16Unorm,
+			format,
 			extent: VkExtent3D {
 				width: width,
 				height: height,
@@ -1001,16 +1135,16 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 			mip_levels: 1,
 			array_layers: 1,
 			samples: VkSampleCount::Sc1,
-			tiling: VkImageTiling::Optimal,
-			usage: VkImageUsage::DepthStencilAttachmentBit,
+			tiling,
+			usage,
 			sharing_mode: VkSharingMode::Exclusive,
 			queue_family_index_count: 0,
 			p_queue_family_indices: ptr::null(),
-			initial_layout: VkImageLayout::Undefined,
+			initial_layout,
 		},
 		ptr::null(),
 		&mut image
-	);
+	).unwrap();
 
 	(connection.get_imgmemreq)(device, image, &mut memory_reqs);
 
@@ -1024,14 +1158,28 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 				connection,
 				gpu,
 				memory_reqs.memory_type_bits,
-				0
+				reqs_mask
 			),
 		},
 		ptr::null(),
 		&mut image_memory
-	);
+	).unwrap();
 
-	(connection.bind_imgmem)(device, image, image_memory, 0);
+	(connection.bind_imgmem)(device, image, image_memory, 0).unwrap();
+
+	(image, image_memory)
+}
+
+#[inline(always)] pub(in renderer) unsafe fn create_depth_buffer(
+	connection: &Connection, device: VkDevice, gpu: VkPhysicalDevice,
+	command_buffer: VkCommandBuffer, submit_fence: VkFence,
+	present_queue: VkQueue, width: u32, height: u32)
+	-> (VkImage, VkImageView, VkDeviceMemory)
+{
+	let (image, image_memory) = create_image(connection, device, gpu, width,
+		height, VkFormat::D16Unorm, VkImageTiling::Optimal,
+		VkImageUsage::DepthStencilAttachmentBit,
+		VkImageLayout::Undefined, 0);
 
 	// before using this depth buffer we must change it's layout:
 	(connection.begin_cmdbuff)(
@@ -1042,12 +1190,12 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 			flags: VkCommandBufferUsage::OneTimeSubmitBit,
 			p_inheritance_info: ptr::null(),
 		}
-	);
+	).unwrap();
 
 	(connection.pipeline_barrier)(
 		command_buffer, 
 		VkPipelineStage::TopOfPipe, 
-		VkPipelineStage::TopOfPipe,
+		VkPipelineStage::TopOfPipeAndEarlyFragmentTests,
 		0,
 		0,
 		ptr::null(),
@@ -1076,7 +1224,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 		}
 	);
 
-	(connection.end_cmdbuff)(command_buffer);
+	(connection.end_cmdbuff)(command_buffer).unwrap();
 
 	(connection.queue_submit)(
 		present_queue,
@@ -1094,39 +1242,15 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 			p_signal_semaphores: ptr::null(),
 		},
 		submit_fence
-	);
+	).unwrap();
 
-	(connection.wait_fence)(device, 1, &submit_fence, 1, u64::MAX);
-	(connection.reset_fence)(device, 1, &submit_fence);
+	(connection.wait_fence)(device, 1, &submit_fence, 1, u64::MAX).unwrap();
+	(connection.reset_fence)(device, 1, &submit_fence).unwrap();
 	(connection.reset_cmdbuff)(command_buffer, 0);
 
 	// create the depth image view:
-	(connection.create_imgview)(
-		device,
-		&VkImageViewCreateInfo {
-			s_type: VkStructureType::ImageViewCreateInfo,
-			p_next: ptr::null(),
-			flags: 0,
-			image: image,
-			view_type: VkImageViewType::SingleLayer2d,
-			format: VkFormat::D16Unorm,
-			components: VkComponentMapping {
-				r: VkComponentSwizzle::Identity,
-				g: VkComponentSwizzle::Identity,
-				b: VkComponentSwizzle::Identity,
-				a: VkComponentSwizzle::Identity,
-			},
-			subresource_range: VkImageSubresourceRange {
-				aspect_mask: VkImageAspectFlags::Depth,
-				base_mip_level: 0,
-				level_count: 1,
-				base_array_layer: 0,
-				layer_count: 1,
-			},
-		},
-		ptr::null(),
-		&mut image_view
-	);
+	let image_view = create_imgview(connection, device, image,
+		VkFormat::D16Unorm, false);
 
 	(image, image_view, image_memory)
 }
@@ -1474,7 +1598,7 @@ pub(in renderer) unsafe fn new_shape(connection: &Connection, device: VkDevice,
 		0,
 		size,
 		0,
-		&mut mapped
+		&mut mapped as *mut *mut _ as *mut *mut Void
 	);
 
 	ptr::copy_nonoverlapping(vertices.as_ptr(), mapped, vertices.len());

@@ -13,31 +13,93 @@ pub type VkBool32 = u32;
 pub type VkSampleMask = u32;
 
 // Non-Dispatchable Handles
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkSurfaceKHR(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkDeviceMemory(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkImage(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkSwapchainKHR(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkRenderPass(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkFramebuffer(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkFence(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkSemaphore(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkImageView(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkBuffer(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkShaderModule(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkPipeline(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkDescriptorSetLayout(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkPipelineLayout(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkSampler(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkDescriptorSet(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkDescriptorPool(u64);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkPipelineCache(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSurfaceKHR(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDeviceMemory(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImage(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSwapchainKHR(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkRenderPass(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFramebuffer(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkFence(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSemaphore(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkImageView(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkBuffer(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkShaderModule(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipeline(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorSetLayout(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipelineLayout(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkSampler(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorSet(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDescriptorPool(u64);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPipelineCache(u64);
 
 // Dispatchable Handles
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkDevice(*mut Void);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkPhysicalDevice(*mut Void);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkInstance(*mut Void);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkCommandBuffer(*mut Void);
-#[repr(C)] #[derive(Copy, Clone)] pub struct VkQueue(*mut Void);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkDevice(*mut Void);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkPhysicalDevice(*mut Void);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkInstance(*mut Void);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkCommandBuffer(*mut Void);
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct VkQueue(*mut Void);
+
+#[repr(C)] pub struct VkSubresourceLayout {
+	pub offset: VkDeviceSize,
+	pub size: VkDeviceSize,
+	pub row_pitch: VkDeviceSize,
+	pub array_pitch: VkDeviceSize,
+	pub depth_pitch: VkDeviceSize,
+}
+
+#[repr(C)] pub struct VkImageSubresource {
+	pub aspect_mask: VkImageAspectFlags,
+	pub mip_level: u32,
+	pub array_layer: u32,
+}
+
+#[repr(C)] pub struct VkSamplerCreateInfo {
+	pub s_type: VkStructureType,
+	pub next: *const Void,
+	pub flags: VkFlags,
+	pub mag_filter: VkFilter,
+	pub min_filter: VkFilter,
+	pub mipmap_mode: VkSamplerMipmapMode,
+	pub address_mode_u: VkSamplerAddressMode,
+	pub address_mode_v: VkSamplerAddressMode,
+	pub address_mode_w: VkSamplerAddressMode,
+	pub mip_lod_bias: f32,
+	pub anisotropy_enable: VkBool32,
+	pub max_anisotropy: f32,
+	pub compare_enable: VkBool32,
+	pub compare_op: VkCompareOp,
+	pub min_lod: f32,
+	pub max_lod: f32,
+	pub border_color: VkBorderColor,
+	pub unnormalized_coordinates: VkBool32
+}
+
+#[repr(C)] pub struct VkFormatProperties {
+	pub linear_tiling_features: VkFlags,
+	pub optimal_tiling_features: VkFlags,
+	pub buffer_features: VkFlags,
+}
+
+#[repr(C)] pub struct VkImageSubresourceLayers {
+	pub aspect_mask: VkImageAspectFlags,
+	pub mip_level: u32,
+	pub base_array_layer: u32,
+	pub layer_count: u32,
+}
+
+#[repr(C)] pub struct VkOffset3D {
+	pub x: i32,
+	pub y: i32,
+	pub z: i32,
+}
+
+#[repr(C)] pub struct VkImageCopy {
+	pub src_subresource: VkImageSubresourceLayers,
+	pub src_offset: VkOffset3D,
+	pub dst_subresource: VkImageSubresourceLayers,
+	pub dst_offset: VkOffset3D,
+	pub extent: VkExtent3D,
+}
 
 #[repr(C)] pub struct VkSemaphoreCreateInfo {
 	pub s_type: VkStructureType,
@@ -587,6 +649,33 @@ pub type VkSampleMask = u32;
 	pub pp_enabled_extension_names: *const *const i8,
 }
 
+#[repr(C)] #[allow(dead_code)] pub enum VkBorderColor {
+	FloatTransparentBlack = 0,
+	IntTransparentBlack = 1,
+	FloatOpaqueBlack = 2,
+	IntOpaqueBlack = 3,
+	FloatOpaqueWhite = 4,
+	IntOpaqueWhite = 5,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkSamplerAddressMode {
+	Repeat = 0,
+	MirroredRepeat = 1,
+	ClampToEdge = 2,
+	ClampToBorder = 3,
+	MirrorClampToEdge = 4,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkSamplerMipmapMode {
+	Nearest = 0,
+	Linear = 1,
+}
+
+#[repr(C)] #[allow(dead_code)] pub enum VkFilter {
+	Nearest = 0,
+	Linear = 1,
+}
+
 #[repr(C)] #[allow(dead_code)] pub enum VkStencilOp {
 	Keep = 0,
 	Zero = 1,
@@ -701,7 +790,7 @@ pub type VkSampleMask = u32;
 #[repr(C)] #[allow(dead_code)] pub enum VkBlendOp {
 	Add = 0,
 	Subtract = 1,
-	Reverse_Subtract = 2,
+	ReverseSubtract = 2,
 	Min = 3,
 	Max = 4,
 }
@@ -835,6 +924,8 @@ pub type VkSampleMask = u32;
 	Host = 0x00004000,
 	AllGraphics = 0x00008000,
 	AllCommands = 0x00010000,
+	TopOfPipeAndColorAttachmentOutput = 0x00000401,
+	TopOfPipeAndEarlyFragmentTests = 0x00000101,
 }
 
 #[repr(C)] #[allow(dead_code)] pub enum VkCommandBufferUsage {
@@ -884,6 +975,7 @@ pub type VkSampleMask = u32;
 	DepthStencilAttachmentBit = 0x00000020,
 	TransientAttachmentBit = 0x00000040,
 	InputAttachmentBit = 0x00000080,
+	TransferDstAndUsage = 0x00000006,
 }
 
 #[repr(C)] #[allow(dead_code)] #[derive(PartialEq, Clone)]
@@ -1163,7 +1255,8 @@ pub enum VkPresentModeKHR {
 	SurfaceCreateInfo = 1000008000, // Android
 }
 
-#[repr(C)] #[allow(dead_code)] #[derive(PartialEq)] pub enum VkResult {
+#[repr(C)] #[allow(dead_code)] #[derive(PartialEq)]
+#[must_use = "Vulkan Result may be an error"] pub enum VkResult {
 	Success = 0,
 	NotReady = 1,
 	Timeout = 2,
@@ -1218,6 +1311,15 @@ impl fmt::Display for VkResult {
 		VkResult::FragmentedPool => write!(f, "Fragmented Pool"),
 		_ => write!(f, "Unknown Error"),
 
+		}
+	}
+}
+
+impl VkResult {
+	/// Panic with error if not `VkResult::Success`.
+	pub fn unwrap(self) -> () {
+		if self != VkResult::Success {
+			panic!("Failed: {}", self);
 		}
 	}
 }

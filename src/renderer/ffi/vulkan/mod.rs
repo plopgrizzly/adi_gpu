@@ -46,12 +46,12 @@ fn check_error(name: &str, error: VkResult) {
 #[cfg(not(feature = "checks"))]
 fn check_error(_: &str, _: VkResult) { }
 
-pub fn copy_memory(connection: &ffi::Connection, vk_device: VkDevice,
-	vk_memory: VkDeviceMemory, data: &[f32])
+pub fn copy_memory<T>(connection: &ffi::Connection, vk_device: VkDevice,
+	vk_memory: VkDeviceMemory, data: &[T])
 {
 	let mapped = unsafe {
 		ffi::map_memory(connection, vk_device, vk_memory,
-			(data.len() * size_of::<f32>()) as u64)
+			(data.len() * size_of::<T>()) as u64)
 	};
 
 	if mapped.is_null() {
