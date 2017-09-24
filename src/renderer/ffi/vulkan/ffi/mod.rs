@@ -165,6 +165,8 @@ pub struct Connection {
 	new_sampler: unsafe extern "system" fn(VkDevice,
 		*const VkSamplerCreateInfo, *const Void, *mut VkSampler)
 		-> VkResult,
+	get_surface_capabilities: unsafe extern "system" fn(VkPhysicalDevice,
+		VkSurfaceKHR, *mut VkSurfaceCapabilitiesKHR) -> VkResult
 }
 
 pub unsafe fn load(app_name: &str) -> Connection {
@@ -237,6 +239,8 @@ pub unsafe fn load(app_name: &str) -> Connection {
 		subres_layout:
 			vk_sym(vk, vksym, b"vkGetImageSubresourceLayout\0"),
 		new_sampler: vk_sym(vk, vksym, b"vkCreateSampler\0"),
+		get_surface_capabilities: vk_sym(vk, vksym,
+			b"vkGetPhysicalDeviceSurfaceCapabilitiesKHR\0"),
 	}
 }
 
@@ -339,10 +343,10 @@ unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
 		}, null_mut!(), &mut instance
 	);
 
-	println!("< WILLOW: App: {}", name);
-	println!("< WILLOW: Engine: {}", engine);
-	println!("< WILLOW: Backend: {}", VERSION.1);
-	println!("< WILLOW: Checks: {}",
+	println!("< adi_gpu: App: {}", name);
+	println!("< adi_gpu: Engine: {}", engine);
+	println!("< adi_gpu: Backend: {}", VERSION.1);
+	println!("< adi_gpu: Checks: {}",
 		if cfg!(feature = "checks") { "Enabled" } else { "Disabled" }
 	);
 
@@ -843,19 +847,11 @@ pub unsafe fn get_color_format(connection: &Connection, gpu: VkPhysicalDevice,
 pub unsafe fn get_buffering(connection: &Connection, gpu: VkPhysicalDevice,
 	surface: VkSurfaceKHR) -> u32
 {
-	// Load function
-	type VkSurfaceInfo = extern "system" fn(
-		physicalDevice: VkPhysicalDevice, surface: VkSurfaceKHR,
-		pSurfaceCapabilities: *mut VkSurfaceCapabilitiesKHR)
-		-> VkResult;
-	let vk_surface_info: VkSurfaceInfo = sym(connection,
-		b"vkGetPhysicalDeviceSurfaceCapabilitiesKHR\0");
-
 	// Set Data
 	let mut surface_info = mem::uninitialized();
 
 	// Run Function
-	vk_surface_info(gpu, surface, &mut surface_info);
+	(connection.get_surface_capabilities)(gpu, surface, &mut surface_info);
 
 	// Process data
 	let min = surface_info.min_image_count;
@@ -875,10 +871,10 @@ pub unsafe fn get_buffering(connection: &Connection, gpu: VkPhysicalDevice,
 	}
 
 	match image_count {
-		1 => println!("< WILLOW: Buffering: Single"),
-		2 => println!("< WILLOW: Buffering: Double"),
-		3 => println!("< WILLOW: Buffering: Triple"),
-		_ => panic!("< WILLOW: Image Count: {}", image_count)
+		1 => println!("< adi_gpu: Buffering: Single"),
+		2 => println!("< adi_gpu: Buffering: Double"),
+		3 => println!("< adi_gpu: Buffering: Triple"),
+		_ => panic!("< adi_gpu: Image Count: {}", image_count)
 	}
 
 	image_count
@@ -946,11 +942,14 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 }
 
 #[inline(always)] pub(in renderer) unsafe fn create_swapchain(
-	connection: &Connection, surface: VkSurfaceKHR, device: VkDevice,
-	swapchain: &mut VkSwapchainKHR, width: u32, height: u32,
-	image_count: &mut u32, color_format: VkFormat,
+	connection: &Connection, surface: VkSurfaceKHR, gpu: VkPhysicalDevice,
+	device: VkDevice, swapchain: &mut VkSwapchainKHR, width: u32,
+	height: u32, image_count: &mut u32, color_format: VkFormat,
 	present_mode: VkPresentModeKHR, swap_images: *mut VkImage)
 {
+	(connection.get_surface_capabilities)(gpu, surface,
+		&mut mem::uninitialized());
+
 	(connection.new_swapchain)(
 		device,
 		&VkSwapchainCreateInfoKHR {

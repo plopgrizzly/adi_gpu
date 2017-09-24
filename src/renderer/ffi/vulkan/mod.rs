@@ -70,14 +70,11 @@ pub fn copy_memory_pitched<T>(connection: &ffi::Connection, vk_device: VkDevice,
 {
 	let mapped : *mut T = unsafe {
 		ffi::map_memory(connection, vk_device, vk_memory, !0)
-//			(data.len() * size_of::<T>()) as u64)
 	};
 
 	if mapped.is_null() {
 		panic!("Couldn't Map Buffer Memory?  Unknown cause.");
 	}
-
-	println!("PITCH {}, ptich {}", pitch, pitch / size_of::<T>() as isize);
 
 	for i in 0..height {
 		extern "C" {

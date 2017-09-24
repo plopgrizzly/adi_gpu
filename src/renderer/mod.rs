@@ -254,6 +254,7 @@ fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 		vulkan::ffi::create_swapchain(
 			connection,
 			vw.surface,
+			vw.gpu,
 			vw.device,
 			&mut vw.swapchain,
 			vw.width,
@@ -383,8 +384,6 @@ fn new_texture(connection: &Connection, vw: &mut Vw, width: u32, height: u32)
 fn set_texture(connection: &Connection, vw: &mut Vw, texture: &mut Texture,
 	rgba: &[u32])
 {
-	println!("width: {} height: {}", texture.w, texture.h);
-
 	if texture.pitch != 4 {
 		vulkan::copy_memory_pitched(connection, vw.device,
 			texture.memory, rgba, texture.w as isize,
@@ -736,6 +735,8 @@ impl Renderer {
 
 impl Drop for Renderer {
 	fn drop(&mut self) -> () {
+		swapchain_delete(&self.connection, &mut self.vw);
+
 		unsafe {
 			ffi::vulkan::ffi::destroy_surface(&self.connection,
 				self.vw.surface);

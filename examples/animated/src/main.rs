@@ -59,8 +59,8 @@ fn main() {
 	let logo_texture = display.push_texture(display_icon);
 	let plopgrizzly_texture = display.push_texture(aci_png::decode(
 		include_bytes!("../res/plopgrizzly.png")).unwrap());
-	let test_texture = display.push_texture(aci_png::decode(
-		include_bytes!("../res/test.png")).unwrap());
+//	let test_texture = display.push_texture(aci_png::decode(
+//		include_bytes!("../res/test.png")).unwrap());
 
 	resize(&mut display, logo_texture, plopgrizzly_texture);
 
