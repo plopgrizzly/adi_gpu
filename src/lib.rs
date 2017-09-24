@@ -6,6 +6,7 @@
 
 // #![no_std]
 
+#[macro_use]
 extern crate ami;
 extern crate awi;
 
@@ -115,7 +116,9 @@ impl Display {
 				self.renderer.solid(vertices, color)
 			},
 			Shape::Texture(vertices, image, txcoords) => {
-				0
+				let vertices = matrix * vertices;
+
+				self.renderer.textured(vertices, image, txcoords)
 			},
 			Shape::Gradient(vertices, colors) => {
 				0
@@ -130,7 +133,7 @@ impl Display {
 	}
 
 	/// Push a texture into GPU memory.
-	pub fn push_texture(&mut self, image_data: &[u32]) -> Texture {
+	pub fn push_texture(&mut self, image_data: Vec<u32>) -> Texture {
 		self.renderer.texture(image_data[0], image_data[1],
 			&image_data[2..])
 	}
@@ -183,15 +186,15 @@ pub enum Shape<'a> {
 	/// A Single-Color Shape `(vertices, color)`
 	Solid(Vec<f32>, Color),
 	/// A Textured Shape `(vertices, image, texture coordinates)`
-	Texture(&'a [f32], u32, &'a [f32]),
+	Texture(Vec<f32>, Texture, Vec<f32>),
 	/// A Multi-Color Shape - One color per vertex `(vertices, colors)`
 	Gradient(&'a [f32], &'a [Color]),
 	/// A Fading Texture Shape
 	/// `(vertices, image, texture coordinates, alpha)`
-	FadeTexture(&'a [f32], u32, &'a [f32], f32),
+	FadeTexture(&'a [f32], Texture, &'a [f32], f32),
 	/// A Tinted Texture Shape
 	/// `(vertices, image, texture coordinates, color)`
-	TintTexture(&'a [f32], u32, &'a [f32], Color),
+	TintTexture(&'a [f32], Texture, &'a [f32], Color),
 }
 
 impl ::std::ops::Mul<(f32, f32, f32)> for Transform {

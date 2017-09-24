@@ -9,10 +9,13 @@ extern crate adi_gpu;
 extern crate aci_png;
 
 const SQUARE_MODEL: &'static [f32] = &include!("../res/square.data");
-// const IMAGE_MODEL: &'static [f32] = &include!("../res/image.data");
+const IMAGE_VERTICES: &'static [f32] = &include!("../res/image.data");
+const IMAGE_TEXCOORDS: &'static [f32] = &include!("../res/image.texc");
 const TRIANGLE_MODEL: &'static [f32] = &include!("../res/triangle.data");
 
-pub fn resize(display: &mut adi_gpu::Display) {
+pub fn resize(display: &mut adi_gpu::Display, image_tex: adi_gpu::Texture,
+	logo_tex: adi_gpu::Texture)
+{
 	println!("!Resizing...");
 
 	// square
@@ -20,13 +23,11 @@ pub fn resize(display: &mut adi_gpu::Display) {
 		translate!(0.5; Z) * SQUARE_MODEL.to_vec(),
 		adi_gpu::Color(0.5, 1.0, 0.5, 0.5)));
 	// image
-//	display.push(adi_gpu::Shape::Texture(IMAGE_MODEL, image, &[
-			
-//		]));
+	display.push(adi_gpu::Shape::Texture(IMAGE_VERTICES.to_vec(), image_tex,
+		IMAGE_TEXCOORDS.to_vec()));
 	// logo
-//	display.push(adi_gpu::Shape::Texture(IMAGE_MODEL, image, &[
-			
-//		]));
+	display.push(adi_gpu::Shape::Texture(IMAGE_VERTICES.to_vec(), logo_tex,
+		IMAGE_TEXCOORDS.to_vec()));
 	// triangle
 	display.push(adi_gpu::Shape::Gradient(TRIANGLE_MODEL,
 		&[
@@ -55,7 +56,13 @@ fn main() {
 
 	let mut queue = adi_gpu::input::Queue::new();
 
-	resize(&mut display);
+	let logo_texture = display.push_texture(display_icon);
+	let plopgrizzly_texture = display.push_texture(aci_png::decode(
+		include_bytes!("../res/plopgrizzly.png")).unwrap());
+	let test_texture = display.push_texture(aci_png::decode(
+		include_bytes!("../res/test.png")).unwrap());
+
+	resize(&mut display, logo_texture, plopgrizzly_texture);
 
 	'app: loop {
 		update(&mut display);
@@ -68,7 +75,8 @@ fn main() {
 
 			match *input {
 				Msg(Quit) | Msg(Back) => break 'app,
-				Resize => resize(&mut display),
+				Resize => resize(&mut display, logo_texture,
+					plopgrizzly_texture),
 				_ => {},
 			}
 		}

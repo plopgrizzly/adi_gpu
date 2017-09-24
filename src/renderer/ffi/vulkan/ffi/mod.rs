@@ -8,7 +8,7 @@ pub mod types;
 
 use self::types::*;
 
-use ami::{ Void, NULL };
+use ami::{ Void };
 use std::{ mem, ptr, u64 };
 use std::ffi::CString;
 
@@ -304,11 +304,11 @@ unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
 	vk_create_instance(
 		&VkInstanceCreateInfo {
 			s_type: VkStructureType::InstanceCreateInfo,
-			p_next: NULL.as_mut_ptr(),
+			p_next: null_mut!(),
 			flags: 0,
 			p_application_info: &VkApplicationInfo {
 				s_type: VkStructureType::ApplicationInfo,
-				p_next: NULL.as_mut_ptr(),
+				p_next: null_mut!(),
 				p_application_name: program_name.as_ptr(),
 				application_version: 2,
 				p_engine_name: engine_name.as_ptr(),
@@ -336,7 +336,7 @@ unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
 					[s1.as_ptr(), s2.as_ptr()].as_ptr()
 				}	
 			},
-		}, NULL.as_mut_ptr(), &mut instance
+		}, null_mut!(), &mut instance
 	);
 
 	println!("< WILLOW: App: {}", name);
@@ -474,12 +474,12 @@ pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 	let ext = CString::new("VK_KHR_swapchain").unwrap();
 	let create_info = VkDeviceCreateInfo {
 		s_type: VkStructureType::DeviceCreateInfo,
-		p_next: NULL.as_mut_ptr(),
+		p_next: null_mut!(),
 		flags: 0,
 		queue_create_info_count: 1,
 		p_queue_create_infos: &VkDeviceQueueCreateInfo {
 			s_type: VkStructureType::DeviceQueueCreateInfo,
-			p_next: NULL.as_mut_ptr(),
+			p_next: null_mut!(),
 			flags: 0,
 			queue_family_index: pqi,
 			queue_count: 1,
@@ -497,10 +497,10 @@ pub unsafe fn create_device(connection: &Connection, gpu: VkPhysicalDevice,
 		},
 		enabled_extension_count: 1,
 		enabled_extension_names: &ext.as_ptr(),
-		enabled_features: NULL.as_mut_ptr(),
+		enabled_features: null_mut!(),
 	};
 
-	vk_create_device(gpu, &create_info, NULL.as_mut_ptr(), &mut device);
+	vk_create_device(gpu, &create_info, null_mut!(), &mut device);
 
 	device
 }
@@ -563,13 +563,13 @@ pub unsafe fn create_command_buffer(connection: &Connection, device: VkDevice,
 
 	let create_info = VkCommandPoolCreateInfo {
 		s_type: VkStructureType::CommandPoolCreateInfo,
-		p_next: NULL.as_mut_ptr(),
+		p_next: null_mut!(),
 		flags: 0x00000002, // Reset Command Buffer
 		queue_family_index: pqi,
 	};
 
 	// Run Function
-	vk_create_command_pool(device, &create_info, NULL.as_mut_ptr(),
+	vk_create_command_pool(device, &create_info, null_mut!(),
 		&mut command_pool);
 
 	// Load Function
@@ -582,7 +582,7 @@ pub unsafe fn create_command_buffer(connection: &Connection, device: VkDevice,
 	// Set Data
 	let allocate_info = VkCommandBufferAllocateInfo {
 		s_type: VkStructureType::CommandBufferAllocateInfo,
-		p_next: NULL.as_mut_ptr(),
+		p_next: null_mut!(),
 		command_pool: command_pool,
 		level: VkCommandBufferLevel::Primary,
 		command_buffer_count: 1,
@@ -615,7 +615,7 @@ pub unsafe fn new_sampler(connection: &Connection, device: VkDevice)
 			address_mode_w: VkSamplerAddressMode::ClampToEdge,
 			mip_lod_bias: 0.0,
 			anisotropy_enable: 0,
-			max_anisotropy: 0.0,
+			max_anisotropy: 1.0,
 			compare_enable: 0,
 			compare_op: VkCompareOp::Never,
 			min_lod: 0.0,
@@ -716,16 +716,27 @@ pub unsafe fn cmd_bind_pipeline(connection: &Connection,
 	);
 }
 
-pub unsafe fn cmd_bind_vb(connection: &Connection, cmd_buf: VkCommandBuffer,
-	vertex_buffer: VkBuffer)
+#[inline(always)] pub unsafe fn cmd_bind_vb(connection: &Connection,
+	cmd_buf: VkCommandBuffer, vertex_buffer: VkBuffer,
+	texc_buffer: VkBuffer, texc: bool)
 {
-	(connection.bind_vb)(
-		cmd_buf,
-		0,
-		1,
-		[vertex_buffer].as_ptr(),
-		[0].as_ptr(),
-	);
+	if texc {
+		(connection.bind_vb)(
+			cmd_buf,
+			0,
+			2,
+			[vertex_buffer, texc_buffer].as_ptr(),
+			[0, 0].as_ptr(),
+		);
+	} else {
+		(connection.bind_vb)(
+			cmd_buf,
+			0,
+			1,
+			[vertex_buffer].as_ptr(),
+			[0].as_ptr(),
+		);
+	}
 }
 
 pub unsafe fn cmd_draw(connection: &Connection, cmd_buf: VkCommandBuffer,
@@ -1393,7 +1404,7 @@ pub(in renderer) unsafe fn txuniform(connection: &Connection, device: VkDevice,
 	desc_set: VkDescriptorSet, tex_count: u32, tex_sampler: VkSampler,
 	tex_view: VkImageView, matrix_buffer: VkBuffer)
 {
-	let num_writes = tex_count != 0;
+	let num_writes = tex_count == 0;
 
 	let write0 = VkWriteDescriptorSet {
 		s_type: VkStructureType::WriteDescriptorSet,
@@ -1414,14 +1425,14 @@ pub(in renderer) unsafe fn txuniform(connection: &Connection, device: VkDevice,
 
 	(connection.update_descsets)(
 		device,
-		if num_writes { 2 } else { 1 },
-		if num_writes { &write0 } else { [write0,
+		if num_writes { 1 } else { 1/*2*/ },
+		if num_writes { &write0 } else { [/*write0,*/
 			VkWriteDescriptorSet {
 				s_type: VkStructureType::WriteDescriptorSet,
 				next: ptr::null(),
 				dst_set: desc_set,
-				dst_binding: 1,
-				descriptor_count: tex_count,
+				dst_binding: 0,
+				descriptor_count: 1, //tex_count,
 				descriptor_type: VkDescriptorType::CombinedImageSampler,
 				image_info: &VkDescriptorImageInfo {
 					sampler: tex_sampler,
@@ -1476,8 +1487,12 @@ pub(in renderer) unsafe fn vw_instance_new(connection: &Connection,
 			max_sets: 1,
 			pool_size_count: 1,
 			pool_sizes: &VkDescriptorPoolSize {
-				 descriptor_type: VkDescriptorType::UniformBuffer,
-				 descriptor_count: 1,
+				descriptor_type: if tex_count == 0 {
+					VkDescriptorType::UniformBuffer
+				} else {
+					VkDescriptorType::CombinedImageSampler
+				},
+				descriptor_count: 1,
 			},
 		},
 		ptr::null(),
@@ -1678,21 +1693,24 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 			s_type: VkStructureType::DescriptorSetLayoutCreateInfo,
 			next: ptr::null(),
 			flags: 0,
-			binding_count: 1/* + shaders[i].textures*/,
+			binding_count: 1 /*1 + *//*shader.textures*/,
 			bindings: [
-				VkDescriptorSetLayoutBinding {
-					binding: 0,
-					descriptor_type: VkDescriptorType::UniformBuffer,
-					descriptor_count: 1,
-					stage_flags: VkShaderStage::Vertex,
-					immutable_samplers: ptr::null(),
-				},
-				VkDescriptorSetLayoutBinding {
-					binding: 1,
-					descriptor_type: VkDescriptorType::CombinedImageSampler,
-					descriptor_count: 1, // Texture Count
-					stage_flags: VkShaderStage::Fragment,
-					immutable_samplers: ptr::null(),
+				if shader.textures == 0 {
+					VkDescriptorSetLayoutBinding {
+						binding: 0,
+						descriptor_type: VkDescriptorType::UniformBuffer,
+						descriptor_count: 1,
+						stage_flags: VkShaderStage::Vertex,
+						immutable_samplers: ptr::null(),
+					}
+				} else {
+					VkDescriptorSetLayoutBinding {
+						binding: 0,
+						descriptor_type: VkDescriptorType::CombinedImageSampler,
+						descriptor_count: 1, // Texture Count
+						stage_flags: VkShaderStage::Fragment,
+						immutable_samplers: ptr::null(),
+					}
 				},
 			].as_ptr(),
 		},
@@ -1750,13 +1768,22 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 				s_type: VkStructureType::PipelineVertexInputStateCreateInfo,
 				next: ptr::null(),
 				flags: 0,
-				vertex_binding_description_count: 1,
-				vertex_binding_descriptions: &VkVertexInputBindingDescription {
-					binding: 0,
-					stride: (mem::size_of::<f32>() * 4 /* * 2*/) as u32,
-					input_rate: VkVertexInputRate::Vertex,
-				},
-				vertex_attribute_description_count: 1/*2*/,
+				vertex_binding_description_count: 1 + shader.textures,
+				vertex_binding_descriptions: [
+					// Vertices
+					VkVertexInputBindingDescription {
+						binding: 0,
+						stride: (mem::size_of::<f32>() * 4) as u32,
+						input_rate: VkVertexInputRate::Vertex,
+					},
+					// Texture Coordinates
+					VkVertexInputBindingDescription {
+						binding: 1,
+						stride: (mem::size_of::<f32>() * 4) as u32,
+						input_rate: VkVertexInputRate::Vertex,
+					},
+				].as_ptr(),
+				vertex_attribute_description_count: 1 + shader.textures/*2*/,
 				vertex_attribute_descriptions: [
 					VkVertexInputAttributeDescription {
 						location: 0,
@@ -1764,12 +1791,12 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 						format: VkFormat::R32g32b32a32Sfloat,
 						offset: 0,
 					},
-					/*VkVertexInputAttributeDescription {
-						.location: 1,
-						.binding: 0,
-						.format: VkFormat::R32g32b32a32Sfloat,
-						.offset: 4 * sizeof(float),
-					},*/
+					VkVertexInputAttributeDescription {
+						location: 1,
+						binding: 1,
+						format: VkFormat::R32g32b32a32Sfloat,
+						offset: 0, //4 * sizeof(float),
+					},
 				].as_ptr(),
 			},
 			input_assembly_state: &VkPipelineInputAssemblyStateCreateInfo {
@@ -1914,7 +1941,7 @@ pub unsafe fn destroy_instance(connection: &Connection) -> () {
 		sym(connection, function_name);
 
 	// Run Function
-	destroy(connection.vk, NULL.as_mut_ptr());
+	destroy(connection.vk, null_mut!());
 }
 
 pub unsafe fn destroy_surface(connection: &Connection, surface: VkSurfaceKHR)
@@ -1927,5 +1954,5 @@ pub unsafe fn destroy_surface(connection: &Connection, surface: VkSurfaceKHR)
 		b"vkDestroySurfaceKHR\0");
 
 	// Run Function
-	destroy(connection.vk, surface, NULL.as_mut_ptr());
+	destroy(connection.vk, surface, null_mut!());
 }

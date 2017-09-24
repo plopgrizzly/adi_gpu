@@ -64,6 +64,39 @@ pub fn copy_memory<T>(connection: &ffi::Connection, vk_device: VkDevice,
 	}
 }
 
+pub fn copy_memory_pitched<T>(connection: &ffi::Connection, vk_device: VkDevice,
+	vk_memory: VkDeviceMemory, data: &[T], width: isize, height: isize,
+	pitch: isize)
+{
+	let mapped : *mut T = unsafe {
+		ffi::map_memory(connection, vk_device, vk_memory, !0)
+//			(data.len() * size_of::<T>()) as u64)
+	};
+
+	if mapped.is_null() {
+		panic!("Couldn't Map Buffer Memory?  Unknown cause.");
+	}
+
+	println!("PITCH {}, ptich {}", pitch, pitch / size_of::<T>() as isize);
+
+	for i in 0..height {
+		extern "C" {
+			fn memcpy(dest: *mut Void, src: *const Void, n: usize)
+				-> MemAddr<Void>;
+		}
+
+		unsafe {
+			memcpy(cast_mut!(mapped.offset(i * pitch / size_of::<T>() as isize)),
+				cast!(data.as_ptr().offset(i * width)),
+				width as usize * size_of::<T>());
+		}
+	}
+
+	unsafe {
+		ffi::unmap_memory(connection, vk_device, vk_memory);
+	}
+}
+
 pub fn cmd_draw(connection: &ffi::Connection, cmd_buffer: VkCommandBuffer,
 	vertex_count: u32)
 {

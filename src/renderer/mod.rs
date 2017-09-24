@@ -58,7 +58,7 @@ pub struct Shader {
 }
 
 impl Shader {
-	pub fn create(connection: &Connection, device: VkDevice, vert: &'static [u8], frag:&'static [u8],
+	pub fn new(connection: &Connection, device: VkDevice, vert: &'static [u8], frag:&'static [u8],
 		textures: u32) -> Shader
 	{
 		let (vertex, fragment) = unsafe {		
@@ -107,6 +107,8 @@ pub struct Shape {
 	shape: VwShape,
 	hastx: bool,
 	instance: VwInstance,
+	texc_buffer_memory: VkDeviceMemory,
+	texc_input_buffer: VkBuffer,
 }
 
 // TODO
@@ -381,11 +383,15 @@ fn new_texture(connection: &Connection, vw: &mut Vw, width: u32, height: u32)
 fn set_texture(connection: &Connection, vw: &mut Vw, texture: &mut Texture,
 	rgba: &[u32])
 {
-	if texture.pitch != 4 {
-		panic!("Texture requested not to be packed!");
-	}
+	println!("width: {} height: {}", texture.w, texture.h);
 
-	vulkan::copy_memory(connection, vw.device, texture.memory, rgba);
+	if texture.pitch != 4 {
+		vulkan::copy_memory_pitched(connection, vw.device,
+			texture.memory, rgba, texture.w as isize,
+			texture.h as isize, texture.pitch as isize);
+	} else {
+		vulkan::copy_memory(connection, vw.device, texture.memory, rgba);
+	}
 
 	if texture.staged {
 		// Use optimal tiled image - create from linear tiled image
@@ -502,6 +508,7 @@ pub struct Renderer {
 	connection: Connection,
 	shapes: Vec<Shape>,
 	style_solid: Style,
+	style_texture: Style,
 	projection: ::Transform,
 }
 
@@ -515,9 +522,12 @@ impl Renderer {
 		let (mut connection, mut vw) = Vw::new(window_name, window_connection);
 		let shapes = Vec::new();
 		let shadev = vec![
-			Shader::create(&connection, vw.device,
+			Shader::new(&connection, vw.device,
 				include_bytes!("../native_renderer/vulkan/res/solid-vert.spv"),
-				include_bytes!("../native_renderer/vulkan/res/solid-frag.spv"), 0)
+				include_bytes!("../native_renderer/vulkan/res/solid-frag.spv"), 0),
+			Shader::new(&connection, vw.device,
+				include_bytes!("../native_renderer/vulkan/res/texture-vert.spv"),
+				include_bytes!("../native_renderer/vulkan/res/texture-frag.spv"), 1),
 		];
 
 		let mut styles = Vec::with_capacity(shadev.len());
@@ -526,7 +536,7 @@ impl Renderer {
 				unsafe {
 					vulkan::ffi::new_pipeline(&connection,
 						vw.device, vw.render_pass,
-						vw.width, vw.height, shadev[0])
+						vw.width, vw.height, *i)
 				}
 			);
 		}
@@ -534,7 +544,10 @@ impl Renderer {
 		let projection = projection(vw.height as f32 / vw.width as f32,
 			90.0);
 
-		Renderer { vw, connection, shapes, style_solid: styles[0], projection }
+		Renderer {
+			vw, connection, shapes, projection,
+			style_solid: styles[0], style_texture: styles[1],
+		}
 	}
 
 	pub fn update(&mut self) {
@@ -567,7 +580,8 @@ impl Renderer {
 			unsafe {
 				vulkan::ffi::cmd_bind_vb(&self.connection,
 					self.vw.command_buffer,
-					shape.shape.vertex_input_buffer);
+					shape.shape.vertex_input_buffer,
+					shape.texc_input_buffer, shape.hastx);
 
 				vulkan::ffi::cmd_bind_pipeline(&self.connection,
 					self.vw.command_buffer,
@@ -611,6 +625,62 @@ impl Renderer {
 		texture
 	}
 
+	pub fn textured(&mut self, vertices: Vec<f32>, texture: Texture,
+		texcoords: Vec<f32>) -> usize
+	{
+		let size = vertices.len() as u32;
+		let hastx = true;
+
+		let (vertex_input_buffer, vertex_buffer_memory) = unsafe {
+			vulkan::ffi::new_shape(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				vertices.as_slice(),
+			)
+		};
+
+		let (texc_input_buffer, texc_buffer_memory) = unsafe {
+			vulkan::ffi::new_shape(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				texcoords.as_slice(),
+			)
+		};
+
+		let shape = VwShape {
+			vertex_buffer_memory, vertex_input_buffer,
+			vertice_count: size / 4,
+		};
+
+		let a = self.shapes.len();
+
+		// Add an instance
+		let instance = unsafe {
+			vulkan::ffi::vw_instance_new(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				self.style_texture,
+				4,
+				texture.view,
+				texture.sampler,
+				1, // 1 texure
+			)
+		};
+
+		/*let matrix = [ color.0, color.1, color.2, color.3 ];
+
+		vulkan::copy_memory(&self.connection, self.vw.device,
+			instance.uniform_memory, &matrix);*/
+
+		println!("PUSH SHAPE");
+		self.shapes.push(Shape { shape, hastx, instance, texc_input_buffer, texc_buffer_memory });
+
+		a
+	}
+
 	pub fn solid(&mut self, vertices: Vec<f32>, color: ::Color) -> usize {
 		let size = vertices.len() as u32;
 		let hastx = false;
@@ -650,8 +720,11 @@ impl Renderer {
 		vulkan::copy_memory(&self.connection, self.vw.device,
 			instance.uniform_memory, &matrix);
 
+		let texc_input_buffer = unsafe { mem::zeroed() };
+		let texc_buffer_memory = unsafe { mem::zeroed() };
+
 		println!("PUSH SHAPE");
-		self.shapes.push(Shape { shape, hastx, instance });
+		self.shapes.push(Shape { shape, hastx, instance, texc_input_buffer, texc_buffer_memory });
 
 		a
 	}

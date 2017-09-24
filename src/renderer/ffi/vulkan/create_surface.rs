@@ -53,7 +53,7 @@ pub fn create_surface_xcb(instance: VkInstance, connection: *mut Void,
 	let mut surface = unsafe { mem::uninitialized() };
 	let surface_create_info = SurfaceCreateInfo {
 		s_type: VkStructureType::SurfaceCreateInfo,
-		p_next: NULL.as_mut_ptr(),
+		p_next: null_mut!(),
 		flags: 0,
 		connection: connection,
 		window: window,
@@ -68,7 +68,7 @@ pub fn create_surface_xcb(instance: VkInstance, connection: *mut Void,
 				surface: *mut VkSurfaceKHR) -> VkResult;
 		}
 		check_error(ERROR, vkCreateXcbSurfaceKHR(instance,
-			&surface_create_info, NULL.as_mut_ptr(), &mut surface));
+			&surface_create_info, null_mut!(), &mut surface));
 	};
 
 	surface
@@ -81,7 +81,7 @@ pub fn create_surface(instance: VkInstance, native_window: &::AwiWindow)
 	let mut surface = unsafe { mem::uninitialized() };
 	let surface_create_info = SurfaceCreateInfo {
 		s_type: VkStructureType::SurfaceCreateInfo,
-		p_next: NULL,
+		p_next: null!(),
 		flags: 0,
 		hinstance: native_window.get_connection(),
 		hwnd: native_window.get_window(),
@@ -96,7 +96,7 @@ pub fn create_surface(instance: VkInstance, native_window: &::AwiWindow)
 				surface: *mut VkSurfaceKHR) -> VkResult;
 		}
 		check_error(ERROR, vkCreateWin32SurfaceKHR(
-			instance, &surface_create_info, NULL, &mut surface
+			instance, &surface_create_info, null!(), &mut surface
 		));
 	};
 
@@ -110,7 +110,7 @@ pub fn create_surface(instance: VkInstance, native_window: &::AwiWindow)
 	let mut surface = unsafe { mem::uninitialized() };
 	let surface_create_info = SurfaceCreateInfo {
 		s_type: VkStructureType::SurfaceCreateInfo,
-		p_next: NULL,
+		p_next: null!(),
 		flags: 0,
 		window: native_window.get_window(),
 	};
@@ -123,7 +123,7 @@ pub fn create_surface(instance: VkInstance, native_window: &::AwiWindow)
 				surface: *mut VkSurfaceKHR) -> VkResult;
 		}
 		check_error(ERROR, vkCreateAndroidSurfaceKHR(
-			instance, &surface_create_info, NULL, &mut surface
+			instance, &surface_create_info, null!(), &mut surface
 		));
 	};
 
