@@ -4,6 +4,9 @@
 //
 // src/lib.rs
 
+//! Aldaron's Device Interface / GPU is a library developed by Plop Grizzly for
+//! interfacing with the GPU to render graphics or do fast calculations.
+
 // #![no_std]
 
 #[macro_use]
@@ -13,66 +16,6 @@ extern crate awi;
 /// Transform represents a transformation matrix.
 #[must_use]
 pub struct Transform(pub [f32; 16]);
-
-/// A Matrix Transform
-#[macro_export] macro_rules! matrix {
-	[$ ( $ x : expr ), *] => ( $crate::Transform([ $( $x ), *]) );
-	[$ ( $ x : expr , ) *] => ( matrix![ $( $x ), *] );
-}
-
-/// A No-Op Transform - An Identity Matrix.
-#[macro_export] macro_rules! identity {
-	() => ( matrix![1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.] );
-}
-
-/// Scale Transformation Matrix
-#[macro_export] macro_rules! scale {
-	($x: expr, $y: expr, $z: expr) =>
-		( matrix![$x,0.,0.,0.,0.,$y,0.,0.,0.,0.,$z,0.,0.,0.,0.,1.] );
-	($x: expr, $y: expr) => ( scale!($x, $y, 1.0) );
-	($s: expr; X) => ( scale!($s, 1.0, 1.0) );
-	($s: expr; Y) => ( scale!(1.0, $s, 1.0) );
-	($s: expr; Z) => ( scale!(1.0, 1.0, $s) );
-	($s: expr; 2D) => ( scale!($s, $s) );
-	($s: expr; 3D) => ( scale!($s, $s, $s) );
-}
-
-/// Translation Matrix
-#[macro_export] macro_rules! translate {
-	($x: expr, $y: expr, $z: expr) =>
-		( matrix![1.,0.,0.,$x,0.,1.,0.,$y,0.,0.,1.,$z,0.,0.,0.,1.] );
-	($x: expr, $y: expr) => ( translate!($x, $y, 0.0) );
-	($s: expr; X) => ( translate!($s, 0.0, 0.0) );
-	($s: expr; Y) => ( translate!(0.0, $s, 0.0) );
-	($s: expr; Z) => ( translate!(0.0, 0.0, $s) );
-}
-
-/// Rotation Matrix
-#[macro_export] macro_rules! rotate {
-	($x: expr, $y: expr, $z: expr) => ({
-		let num9 = $z * ::std::f32::consts::PI;
-		let num6 = num9.sin();
-		let num5 = num9.cos();
-		let num8 = $x * ::std::f32::consts::PI;
-		let num4 = num8.sin();
-		let num3 = num8.cos();
-		let num7 = $y * ::std::f32::consts::PI;
-		let num2 = num7.sin();
-		let num = num7.cos();
-
-		let qx = ((num * num4) * num5) + ((num2 * num3) * num6);
-		let qy = ((num2 * num3) * num5) - ((num * num4) * num6);
-		let qz = ((num * num3) * num6) - ((num2 * num4) * num5);
-		let qw = ((num * num3) * num5) + ((num2 * num4) * num6);
-
-		let nx = -qx;
-		let ny = -qy;
-		let nz = -qz;
-
-		matrix![qw,nz,qy,nx,qz,qw,nx,ny,ny,qx,qw,nz,qx,qy,qz,qw] *
-			matrix![qw,nz,qy,qx,qz,qw,nx,qy,ny,qx,qw,qz,nx,ny,nz,qw]
-	});
-}
 
 mod renderer;
 mod render_ops;
@@ -87,8 +30,7 @@ pub mod input {
 pub use render_ops::RenderOps;
 pub use renderer::Texture;
 
-/// To render anything with The Willow Graphics API, you have to make a
-/// `Display`
+/// To render anything with adi_gpu, you have to make a `Display`
 pub struct Display {
 	window: awi::Window,
 	renderer: renderer::Renderer,
@@ -105,19 +47,15 @@ impl Display {
 		Display { window, renderer }
 	}
 
-	/// Add a `Shape` onto the `Display`.
+	/*/// Add a `Shape` onto the `Display`.
 	pub fn push(&mut self, shape: Shape) -> usize {
 		let matrix = self.renderer.get_projection();
 
 		match shape {
 			Shape::Solid(vertices, color) => {
-				let vertices = matrix * vertices;
-
 				self.renderer.solid(vertices, color)
 			},
 			Shape::Texture(vertices, image, txcoords) => {
-				let vertices = matrix * vertices;
-
 				self.renderer.textured(vertices, image, txcoords)
 			},
 			Shape::Gradient(vertices, colors) => {
@@ -130,13 +68,13 @@ impl Display {
 				0
 			},
 		}
-	}
+	}*/
 
-	/// Push a texture into GPU memory.
-	pub fn push_texture(&mut self, image_data: Vec<u32>) -> Texture {
+	// Push a texture into GPU memory.
+/*	pub fn push_texture(&mut self, image_data: Vec<u32>) -> Texture {
 		self.renderer.texture(image_data[0], image_data[1],
 			&image_data[2..])
-	}
+	}*/
 
 	/// Update the display / window.
 	pub fn update(&mut self, input_queue: &mut input::Queue) {
@@ -182,11 +120,11 @@ pub struct Color(pub f32, pub f32, pub f32, pub f32);
 }*/
 
 /// A drawable shape.
-pub enum Shape<'a> {
+/*pub enum Shape<'a> {
 	/// A Single-Color Shape `(vertices, color)`
-	Solid(Vec<f32>, Color),
+	Solid(&'a [f32], Color),
 	/// A Textured Shape `(vertices, image, texture coordinates)`
-	Texture(Vec<f32>, Texture, Vec<f32>),
+	Texture(&'a [f32], Texture, &'a [f32]),
 	/// A Multi-Color Shape - One color per vertex `(vertices, colors)`
 	Gradient(&'a [f32], &'a [Color]),
 	/// A Fading Texture Shape
@@ -195,42 +133,156 @@ pub enum Shape<'a> {
 	/// A Tinted Texture Shape
 	/// `(vertices, image, texture coordinates, color)`
 	TintTexture(&'a [f32], Texture, &'a [f32], Color),
-}
+}*/
 
-impl ::std::ops::Mul<(f32, f32, f32)> for Transform {
-	type Output = Transform;
-
-	fn mul(mut self, rhs: (f32, f32, f32)) -> Self::Output {
-		self.0[0] *= rhs.0;
-		self.0[5] *= rhs.1;
-		self.0[15] *= rhs.2;
-
-		self
+impl Texture {
+	/// Create a new texture.
+	pub fn new(display: &mut Display, image_data: &[u32]) -> Texture {
+		display.renderer.texture(image_data[0], image_data[1],
+			&image_data[2..])
 	}
 }
 
-// 11 0
-// 12 1 
-// 13 2
-// 14 3 
-// 21 4
-// 22 5
-// 23 6
-// 24 7
-// 31 8
-// 32 9
-// 33 10
-// 34 11
-// 41 12
-// 42 13
-// 43 14
-// 44 15
+pub struct Shape(usize);
+
+impl Shape {
+	/// `Transform` the `Shape`.
+	pub fn transform(&self, display: &mut Display, transform: &Transform)
+		-> Shape
+	{
+		Shape(display.renderer.transform(self.0, transform))
+	}
+}
+
+pub struct ShapeBuilder<'a> {
+	vertices: &'a [f32],
+}
+
+impl<'a> ShapeBuilder<'a> {
+	/// Obtain a new `ShapeBuilder` with `vertices`.
+	#[inline(always)]
+	pub fn new(vertices: &'a [f32]) -> ShapeBuilder {
+		ShapeBuilder { vertices }
+	}
+
+	/// Push a shape with a solid color.
+	#[inline(always)]
+	pub fn push_solid(&self, display: &mut Display, color: Color) -> Shape {
+		Shape(display.renderer.solid(self.vertices, color))
+	}
+
+	/// Push a shape with shaded by a gradient (1 color per vertex).
+	#[inline(always)]
+	pub fn push_gradient(&self, display: &mut Display, color: &[f32])
+		-> Shape
+	{
+		Shape(display.renderer.gradient(self.vertices, color))
+	}
+
+	/// Push a shape with a texture and texture coordinates.
+	#[inline(always)]
+	pub fn push_texture(&self, display: &mut Display, texture: Texture,
+		tc: &[f32]) -> Shape
+	{
+		Shape(display.renderer.textured(self.vertices, texture, tc))
+	}
+
+	/// Push a shape with a texture, texture coordinates and alpha.
+	#[inline(always)]
+	pub fn push_faded(&self, display: &mut Display, texture: Texture,
+		tc: &[f32], alpha: f32) -> Shape
+	{
+//		display.renderer.textured(self.vertices, image, tc)
+		Shape(0)
+	}
+
+	/// Push a shape with a texture and texture coordinates and tint.
+	#[inline(always)]
+	pub fn push_tinted(&self, display: &mut Display, texture: Texture,
+		tc: &[f32], tint: Color) -> Shape
+	{
+//		display.renderer.textured(self.vertices, image, tc)
+		Shape(0)
+	}
+}
+
+impl Transform {
+	/// A no-op transform (identity matrix).
+	pub fn new() -> Transform {
+		Transform([
+			1.0, 0.0, 0.0, 0.0,
+			0.0, 1.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0,
+		])
+	}
+
+	/// Multiply `self` by a matrix.
+	pub fn matrix(self, matrix: [f32; 16]) -> Transform {
+		self * Transform(matrix)
+	}
+
+	/// Multiply `self` by a scale transformation matrix.
+	pub fn scale(self, x: f32, y: f32, z: f32) -> Transform {
+		self.matrix([
+			x,   0.0, 0.0, 0.0,
+			0.0, y,   0.0, 0.0,
+			0.0, 0.0, z,   0.0,
+			0.0, 0.0, 0.0, 1.0,
+		])
+	}
+
+	/// Multiply `self` by a translation matrix.
+	pub fn translate(self, x: f32, y: f32, z: f32) -> Transform {
+		self.matrix([
+			1.0, 0.0, 0.0, 0.0,
+			0.0, 1.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			x,   y,   z,   1.0,
+		])
+	}
+
+	/// Multiply `self` by a rotation matrix.  `x`, `y` and `z` are in PI
+	/// Radians.
+	pub fn rotate(self, x: f32, y: f32, z: f32) -> Transform {
+		let num9 = z * ::std::f32::consts::PI;
+		let num6 = num9.sin();
+		let num5 = num9.cos();
+		let num8 = x * ::std::f32::consts::PI;
+		let num4 = num8.sin();
+		let num3 = num8.cos();
+		let num7 = y * ::std::f32::consts::PI;
+		let num2 = num7.sin();
+		let num = num7.cos();
+
+		let qx = ((num * num4) * num5) + ((num2 * num3) * num6);
+		let qy = ((num2 * num3) * num5) - ((num * num4) * num6);
+		let qz = ((num * num3) * num6) - ((num2 * num4) * num5);
+		let qw = ((num * num3) * num5) + ((num2 * num4) * num6);
+
+		let nx = -qx;
+		let ny = -qy;
+		let nz = -qz;
+
+		self.matrix([
+			qw,nz,qy,nx,
+			qz,qw,nx,ny,
+			ny,qx,qw,nz,
+			qx,qy,qz,qw
+		]).matrix([
+			qw,nz,qy,qx,
+			qz,qw,nx,qy,
+			ny,qx,qw,qz,
+			nx,ny,nz,qw
+		])
+	}
+}
 
 impl ::std::ops::Mul<Transform> for Transform {
 	type Output = Transform;
 
 	fn mul(self, rhs: Transform) -> Self::Output {
-		matrix![
+		Transform([
 			(self.0[0] * rhs.0[0]) + (self.0[1] * rhs.0[4]) +
 			(self.0[2] * rhs.0[8]) + (self.0[3] * rhs.0[12]),
 			(self.0[0] * rhs.0[1]) + (self.0[1] * rhs.0[5]) +
@@ -266,34 +318,6 @@ impl ::std::ops::Mul<Transform> for Transform {
 			(self.0[14] * rhs.0[10]) + (self.0[15] * rhs.0[14]),
 			(self.0[12] * rhs.0[3]) + (self.0[13] * rhs.0[7]) +
 			(self.0[14] * rhs.0[11]) + (self.0[15] * rhs.0[15])
-		]
-	}
-}
-
-impl ::std::ops::Mul<Vec<f32>> for Transform {
-	type Output = Vec<f32>;
-
-	fn mul(self, rhs: Vec<f32>) -> Self::Output {
-		let mut model = rhs;
-
-		for i in 0..(model.len() / 4) {
-			let i = i * 4;
-
-			let x = model[i + 0];
-			let y = model[i + 1];
-			let z = model[i + 2];
-			let w = model[i + 3];
-
-			model[i + 0] = self.0[0] * x + self.0[1] * y
-				+ self.0[2] * z + self.0[3] * w;
-			model[i + 1] = self.0[4] * x + self.0[5] * y
-				+ self.0[6] * z + self.0[7] * w;
-			model[i + 2] = self.0[8] * x + self.0[9] * y
-				+ self.0[10] * z + self.0[11] * w;
-			model[i + 3] = self.0[12] * x + self.0[13] * y
-				+ self.0[14] * z + self.0[15] * w;
-		}
-
-		model
+		])
 	}
 }

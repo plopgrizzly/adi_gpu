@@ -4,7 +4,6 @@
 //
 // examples/animated/main.rs
 
-#[macro_use]
 extern crate adi_gpu;
 extern crate aci_png;
 
@@ -19,28 +18,32 @@ pub fn resize(display: &mut adi_gpu::Display, image_tex: adi_gpu::Texture,
 	println!("!Resizing...");
 
 	// square
-	display.push(adi_gpu::Shape::Solid(
-		translate!(0.5; Z) * SQUARE_MODEL.to_vec(),
-		adi_gpu::Color(0.5, 1.0, 0.5, 0.5)));
+	adi_gpu::ShapeBuilder::new(SQUARE_MODEL)
+		.push_solid(display, adi_gpu::Color(0.5, 1.0, 0.5, 0.5))
+		.transform(display, &adi_gpu::Transform::new()
+			.translate(0.0, 0.0, 0.5).rotate(0.25, 0.0, 0.0));
 	// image
-	display.push(adi_gpu::Shape::Texture(IMAGE_VERTICES.to_vec(), image_tex,
-		IMAGE_TEXCOORDS.to_vec()));
+	adi_gpu::ShapeBuilder::new(IMAGE_VERTICES)
+		.push_texture(display, image_tex, IMAGE_TEXCOORDS);
 	// logo
-	display.push(adi_gpu::Shape::Texture(IMAGE_VERTICES.to_vec(), logo_tex,
-		IMAGE_TEXCOORDS.to_vec()));
+	adi_gpu::ShapeBuilder::new(IMAGE_VERTICES)
+		.push_texture(display, logo_tex, IMAGE_TEXCOORDS)
+		.transform(display, &adi_gpu::Transform::new()
+			.translate(0.5, 0.5, 0.0));
 	// triangle
-	display.push(adi_gpu::Shape::Gradient(TRIANGLE_MODEL,
-		&[
+	adi_gpu::ShapeBuilder::new(TRIANGLE_MODEL)
+		.push_gradient(display, &[
 			adi_gpu::Color(1.0, 0.0, 0.0, 1.0),
 			adi_gpu::Color(0.0, 1.0, 0.0, 1.0),
 			adi_gpu::Color(0.0, 0.0, 1.0, 1.0)
-		]));
+		]);
 	// new!
-//	display.push(adi_gpu::Shape::FadeTexture(vertices, image, texcoords,
-//		0.5));
+	adi_gpu::ShapeBuilder::new(IMAGE_VERTICES)
+		.push_faded(display, image_tex, IMAGE_TEXCOORDS, 0.5);
 	// new!
-//	display.push(adi_gpu::Shape::TintTexture(vertices, image, texcoords,
-//		adi_gpu::Color(1.0, 1.0, 0.0, 0.5)));
+	adi_gpu::ShapeBuilder::new(IMAGE_VERTICES)
+		.push_tinted(display, image_tex, IMAGE_TEXCOORDS,
+			adi_gpu::Color(1.0, 1.0, 0.0, 0.5));
 }
 
 pub fn update(_: &mut adi_gpu::Display) {
@@ -56,9 +59,10 @@ fn main() {
 
 	let mut queue = adi_gpu::input::Queue::new();
 
-	let logo_texture = display.push_texture(display_icon);
-	let plopgrizzly_texture = display.push_texture(aci_png::decode(
-		include_bytes!("../res/plopgrizzly.png")).unwrap());
+	let logo_texture = adi_gpu::Texture::new(&mut display, display_icon.as_slice());
+	let plopgrizzly_texture = adi_gpu::Texture::new(&mut display,
+		aci_png::decode(include_bytes!("../res/plopgrizzly.png"))
+			.unwrap().as_slice());
 //	let test_texture = display.push_texture(aci_png::decode(
 //		include_bytes!("../res/test.png")).unwrap());
 

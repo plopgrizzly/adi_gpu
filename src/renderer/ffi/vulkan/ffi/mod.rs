@@ -1401,7 +1401,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 
 pub(in renderer) unsafe fn txuniform(connection: &Connection, device: VkDevice,
 	desc_set: VkDescriptorSet, tex_count: u32, tex_sampler: VkSampler,
-	tex_view: VkImageView, matrix_buffer: VkBuffer)
+	tex_view: VkImageView, matrix_buffer: VkBuffer, num_bytes: usize)
 {
 	let num_writes = tex_count == 0;
 
@@ -1414,7 +1414,7 @@ pub(in renderer) unsafe fn txuniform(connection: &Connection, device: VkDevice,
 		buffer_info: &VkDescriptorBufferInfo {
 			buffer: matrix_buffer,
 			offset: 0,
-			range: (mem::size_of::<f32>() * 4) as u64,
+			range: num_bytes as u64,
 		},
 		dst_array_element: 0,
 		texel_buffer_view: ptr::null(),
@@ -1424,13 +1424,13 @@ pub(in renderer) unsafe fn txuniform(connection: &Connection, device: VkDevice,
 
 	(connection.update_descsets)(
 		device,
-		if num_writes { 1 } else { 1/*2*/ },
-		if num_writes { &write0 } else { [/*write0,*/
+		if num_writes { 1 } else { 2 },
+		if num_writes { &write0 } else { [write0,
 			VkWriteDescriptorSet {
 				s_type: VkStructureType::WriteDescriptorSet,
 				next: ptr::null(),
 				dst_set: desc_set,
-				dst_binding: 0,
+				dst_binding: 1,
 				descriptor_count: 1, //tex_count,
 				descriptor_type: VkDescriptorType::CombinedImageSampler,
 				image_info: &VkDescriptorImageInfo {
@@ -1450,7 +1450,7 @@ pub(in renderer) unsafe fn txuniform(connection: &Connection, device: VkDevice,
 
 pub(in renderer) unsafe fn vw_instance_new(connection: &Connection,
 	device: VkDevice, gpu: VkPhysicalDevice, pipeline: ::renderer::Style,
-	num_floats: usize, tex_view: VkImageView, tex_sampler: VkSampler,
+	num_bytes: usize, tex_view: VkImageView, tex_sampler: VkSampler,
 	tex_count: u32) -> ::renderer::VwInstance
 {
 	let mut uniform_buffer = mem::uninitialized();
@@ -1466,7 +1466,7 @@ pub(in renderer) unsafe fn vw_instance_new(connection: &Connection,
 			s_type: VkStructureType::BufferCreateInfo,
 			next: ptr::null(),
 			flags: 0,
-			size: (mem::size_of::<f32>() * num_floats) as u64,
+			size: num_bytes as u64,
 			usage: VkBufferUsage::UniformBufferBit,
 			sharing_mode: VkSharingMode::Exclusive,
 			queue_family_index_count: 0,
@@ -1484,14 +1484,21 @@ pub(in renderer) unsafe fn vw_instance_new(connection: &Connection,
 			next: ptr::null(),
 			flags: 0,
 			max_sets: 1,
-			pool_size_count: 1,
-			pool_sizes: &VkDescriptorPoolSize {
-				descriptor_type: if tex_count == 0 {
-					VkDescriptorType::UniformBuffer
-				} else {
-					VkDescriptorType::CombinedImageSampler
+			pool_size_count: if tex_count == 0 { 1 } else { 2 },
+			pool_sizes: if tex_count == 0 {
+				[VkDescriptorPoolSize { descriptor_type: 
+					VkDescriptorType::UniformBuffer,
+					descriptor_count: 1,
+				}].as_ptr()
+			} else {
+				[VkDescriptorPoolSize { descriptor_type: 
+					VkDescriptorType::UniformBuffer,
+					descriptor_count: 1,
 				},
-				descriptor_count: 1,
+				VkDescriptorPoolSize { descriptor_type: 
+					VkDescriptorType::CombinedImageSampler,
+					descriptor_count: 1,
+				}].as_ptr()
 			},
 		},
 		ptr::null(),
@@ -1542,7 +1549,7 @@ pub(in renderer) unsafe fn vw_instance_new(connection: &Connection,
 	);
 // }
 	txuniform(connection, device, desc_set, tex_count, tex_sampler,
-		tex_view, uniform_buffer);
+		tex_view, uniform_buffer, num_bytes);
 
 	::renderer::VwInstance {
 		matrix_buffer: uniform_buffer,
@@ -1692,26 +1699,31 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 			s_type: VkStructureType::DescriptorSetLayoutCreateInfo,
 			next: ptr::null(),
 			flags: 0,
-			binding_count: 1 /*1 + *//*shader.textures*/,
-			bindings: [
-				if shader.textures == 0 {
-					VkDescriptorSetLayoutBinding {
-						binding: 0,
-						descriptor_type: VkDescriptorType::UniformBuffer,
-						descriptor_count: 1,
-						stage_flags: VkShaderStage::Vertex,
-						immutable_samplers: ptr::null(),
-					}
-				} else {
-					VkDescriptorSetLayoutBinding {
-						binding: 0,
-						descriptor_type: VkDescriptorType::CombinedImageSampler,
-						descriptor_count: 1, // Texture Count
-						stage_flags: VkShaderStage::Fragment,
-						immutable_samplers: ptr::null(),
-					}
+			binding_count: 1 + shader.textures,
+			bindings: if shader.textures == 0 {
+				[VkDescriptorSetLayoutBinding {
+					binding: 0,
+					descriptor_type: VkDescriptorType::UniformBuffer,
+					descriptor_count: 1,
+					stage_flags: VkShaderStage::Vertex,
+					immutable_samplers: ptr::null(),
+				}].as_ptr()
+			} else {
+				[VkDescriptorSetLayoutBinding {
+					binding: 0,
+					descriptor_type: VkDescriptorType::UniformBuffer,
+					descriptor_count: 1,
+					stage_flags: VkShaderStage::Vertex,
+					immutable_samplers: ptr::null(),
 				},
-			].as_ptr(),
+				VkDescriptorSetLayoutBinding {
+					binding: 1,
+					descriptor_type: VkDescriptorType::CombinedImageSampler,
+					descriptor_count: 1, // Texture Count
+					stage_flags: VkShaderStage::Fragment,
+					immutable_samplers: ptr::null(),
+				}].as_ptr()
+			},
 		},
 		ptr::null(),
 		&mut descsetlayout
@@ -1767,7 +1779,7 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 				s_type: VkStructureType::PipelineVertexInputStateCreateInfo,
 				next: ptr::null(),
 				flags: 0,
-				vertex_binding_description_count: 1 + shader.textures,
+				vertex_binding_description_count: 1 + shader.vertex_buffers,
 				vertex_binding_descriptions: [
 					// Vertices
 					VkVertexInputBindingDescription {
@@ -1782,7 +1794,7 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 						input_rate: VkVertexInputRate::Vertex,
 					},
 				].as_ptr(),
-				vertex_attribute_description_count: 1 + shader.textures/*2*/,
+				vertex_attribute_description_count: 1 + shader.vertex_buffers/*2*/,
 				vertex_attribute_descriptions: [
 					VkVertexInputAttributeDescription {
 						location: 0,
@@ -1857,12 +1869,12 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 				depth_test_enable: 1,
 				depth_write_enable: 1,
 				depth_compare_op: VkCompareOp::LessOrEqual,
-				depth_bounds_test_enable: 0,
+				depth_bounds_test_enable: 0, // 
 				stencil_test_enable: 0,
 				front: no_op_stencil_state,
 				back: no_op_stencil_state,
-				min_depth_bounds: 0.0,
-				max_depth_bounds: 0.0,
+				min_depth_bounds: 0.0, // unused
+				max_depth_bounds: 0.0, // unused
 			},
 			color_blend_state: &VkPipelineColorBlendStateCreateInfo {
 				s_type: VkStructureType::PipelineColorBlendStateCreateInfo,

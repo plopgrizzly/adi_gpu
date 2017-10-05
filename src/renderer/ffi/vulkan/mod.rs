@@ -47,19 +47,27 @@ fn check_error(name: &str, error: VkResult) {
 fn check_error(_: &str, _: VkResult) { }
 
 pub fn copy_memory<T>(connection: &ffi::Connection, vk_device: VkDevice,
-	vk_memory: VkDeviceMemory, data: &[T])
+	vk_memory: VkDeviceMemory, data: *const T, size: usize)
 {
 	let mapped = unsafe {
-		ffi::map_memory(connection, vk_device, vk_memory,
-			(data.len() * size_of::<T>()) as u64)
+		ffi::map_memory(connection, vk_device, vk_memory, !0)
 	};
 
 	if mapped.is_null() {
 		panic!("Couldn't Map Buffer Memory?  Unknown cause.");
 	}
 
+	extern "C" {
+		fn memcpy(dest: *mut Void, src: *const Void, n: usize)
+			-> MemAddr<Void>;
+	}
+
 	unsafe {
-		ptr::copy_nonoverlapping(data.as_ptr(), mapped, data.len());
+		memcpy(cast_mut!(mapped), cast!(data), size);
+	}
+
+	unsafe {
+//		ptr::copy_nonoverlapping(data.as_ptr(), mapped, data.len());
 		ffi::unmap_memory(connection, vk_device, vk_memory);
 	}
 }
