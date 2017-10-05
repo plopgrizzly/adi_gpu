@@ -5,7 +5,7 @@
 // src/native_renderer/vulkan/glsl/gradient.vert
 
 #version 450
-// #extension GL_ARB_separate_shader_objects : enable // TODO: is needed?
+#extension GL_ARB_separate_shader_objects : enable
 
 layout (binding = 0) uniform UniformBuffer {
 	mat4 mtf;

@@ -1748,7 +1748,7 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 	// setup shader stages:
 	(connection.new_pipeline)(
 		device,
-		mem::zeroed(), 
+		mem::zeroed(),
 		1,
 		&VkGraphicsPipelineCreateInfo {
 			s_type: VkStructureType::GraphicsPipelineCreateInfo,
@@ -1779,7 +1779,7 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 				s_type: VkStructureType::PipelineVertexInputStateCreateInfo,
 				next: ptr::null(),
 				flags: 0,
-				vertex_binding_description_count: 1 + shader.vertex_buffers,
+				vertex_binding_description_count: shader.vertex_buffers,
 				vertex_binding_descriptions: [
 					// Vertices
 					VkVertexInputBindingDescription {
@@ -1794,7 +1794,7 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 						input_rate: VkVertexInputRate::Vertex,
 					},
 				].as_ptr(),
-				vertex_attribute_description_count: 1 + shader.vertex_buffers/*2*/,
+				vertex_attribute_description_count: shader.vertex_buffers,
 				vertex_attribute_descriptions: [
 					VkVertexInputAttributeDescription {
 						location: 0,

@@ -33,9 +33,9 @@ pub fn resize(display: &mut adi_gpu::Display, image_tex: adi_gpu::Texture,
 	// triangle
 	adi_gpu::ShapeBuilder::new(TRIANGLE_MODEL)
 		.push_gradient(display, &[
-			adi_gpu::Color(1.0, 0.0, 0.0, 1.0),
-			adi_gpu::Color(0.0, 1.0, 0.0, 1.0),
-			adi_gpu::Color(0.0, 0.0, 1.0, 1.0)
+			1.0, 0.0, 0.0, 1.0,
+			0.0, 1.0, 0.0, 1.0,
+			0.0, 0.0, 1.0, 1.0,
 		]);
 	// new!
 	adi_gpu::ShapeBuilder::new(IMAGE_VERTICES)
