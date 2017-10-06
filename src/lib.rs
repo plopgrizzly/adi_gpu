@@ -47,35 +47,6 @@ impl Display {
 		Display { window, renderer }
 	}
 
-	/*/// Add a `Shape` onto the `Display`.
-	pub fn push(&mut self, shape: Shape) -> usize {
-		let matrix = self.renderer.get_projection();
-
-		match shape {
-			Shape::Solid(vertices, color) => {
-				self.renderer.solid(vertices, color)
-			},
-			Shape::Texture(vertices, image, txcoords) => {
-				self.renderer.textured(vertices, image, txcoords)
-			},
-			Shape::Gradient(vertices, colors) => {
-				0
-			},
-			Shape::FadeTexture(vertices, image, txcoords, a) => {
-				0
-			},
-			Shape::TintTexture(vertices, image, txcoords, colr) => {
-				0
-			},
-		}
-	}*/
-
-	// Push a texture into GPU memory.
-/*	pub fn push_texture(&mut self, image_data: Vec<u32>) -> Texture {
-		self.renderer.texture(image_data[0], image_data[1],
-			&image_data[2..])
-	}*/
-
 	/// Update the display / window.
 	pub fn update(&mut self, input_queue: &mut input::Queue) {
 		self.renderer.update();
@@ -86,54 +57,6 @@ impl Display {
 		}
 	}
 }
-
-/// An RGBA color.
-#[repr(C)]
-pub struct Color(pub f32, pub f32, pub f32, pub f32);
-
-/*/// Macro to create a `Color`, from rgba.  Each compenents range: 0.0 to 1.0.
-#[macro_export] macro_rules! color {
-	($rgba:expr) => ({
-		let rgba : [u8;4] = unsafe { ::std::mem::transmute($rgba) };
-		let transform = ::std::u16::MAX as f64 / ::std::u8::MAX as f64;
-
-		let r = (rgba[0] as f64 * transform) as u16;
-		let g = (rgba[1] as f64 * transform) as u16;
-		let b = (rgba[2] as f64 * transform) as u16;
-		let a = (rgba[3] as f64 * transform) as u16;
-
-		let bgra = [b, g, r, a];
-
-		willow::Color(unsafe { ::std::mem::transmute(bgra) })
-	});
-
-	(r: f64, g: f64, b: f64, a: f64) => ({
-		let r: u16 = r * ::std::u16::MAX;
-		let g: u16 = g * ::std::u16::MAX;
-		let b: u16 = b * ::std::u16::MAX;
-		let a: u16 = a * ::std::u16::MAX;
-
-		let bgra = [b, g, r, a];
-
-		willow::Color(unsafe { ::std::mem::transmute(bgra) })
-	});
-}*/
-
-/// A drawable shape.
-/*pub enum Shape<'a> {
-	/// A Single-Color Shape `(vertices, color)`
-	Solid(&'a [f32], Color),
-	/// A Textured Shape `(vertices, image, texture coordinates)`
-	Texture(&'a [f32], Texture, &'a [f32]),
-	/// A Multi-Color Shape - One color per vertex `(vertices, colors)`
-	Gradient(&'a [f32], &'a [Color]),
-	/// A Fading Texture Shape
-	/// `(vertices, image, texture coordinates, alpha)`
-	FadeTexture(&'a [f32], Texture, &'a [f32], f32),
-	/// A Tinted Texture Shape
-	/// `(vertices, image, texture coordinates, color)`
-	TintTexture(&'a [f32], Texture, &'a [f32], Color),
-}*/
 
 impl Texture {
 	/// Create a new texture.
@@ -167,7 +90,9 @@ impl<'a> ShapeBuilder<'a> {
 
 	/// Push a shape with a solid color.
 	#[inline(always)]
-	pub fn push_solid(&self, display: &mut Display, color: Color) -> Shape {
+	pub fn push_solid(&self, display: &mut Display, color: [f32; 4])
+		-> Shape
+	{
 		Shape(display.renderer.solid(self.vertices, color))
 	}
 
@@ -180,6 +105,7 @@ impl<'a> ShapeBuilder<'a> {
 	}
 
 	/// Push a shape with a texture and texture coordinates.
+	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`.
 	#[inline(always)]
 	pub fn push_texture(&self, display: &mut Display, texture: Texture,
 		tc: &[f32]) -> Shape
@@ -188,21 +114,32 @@ impl<'a> ShapeBuilder<'a> {
 	}
 
 	/// Push a shape with a texture, texture coordinates and alpha.
+	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`.
 	#[inline(always)]
 	pub fn push_faded(&self, display: &mut Display, texture: Texture,
 		tc: &[f32], alpha: f32) -> Shape
 	{
-//		display.renderer.textured(self.vertices, image, tc)
-		Shape(0)
+		Shape(display.renderer.faded(self.vertices, texture, tc, alpha))
 	}
 
 	/// Push a shape with a texture and texture coordinates and tint.
+	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`.
 	#[inline(always)]
 	pub fn push_tinted(&self, display: &mut Display, texture: Texture,
-		tc: &[f32], tint: Color) -> Shape
+		tc: &[f32], tint: [f32; 4]) -> Shape
 	{
-//		display.renderer.textured(self.vertices, image, tc)
-		Shape(0)
+		Shape(display.renderer.tinted(self.vertices, texture, tc, tint))
+	}
+
+	/// Push a shape with a texture and texture coordinates and tint per
+	/// vertex.
+	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`.
+	#[inline(always)]
+	pub fn push_complex(&self, display: &mut Display, texture: Texture,
+		tc: &[f32], tints: &[f32]) -> Shape
+	{
+		Shape(display.renderer.complex(self.vertices, texture, tc,
+			tints))
 	}
 }
 

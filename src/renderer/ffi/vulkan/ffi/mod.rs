@@ -721,26 +721,26 @@ pub unsafe fn cmd_bind_pipeline(connection: &Connection,
 }
 
 #[inline(always)] pub unsafe fn cmd_bind_vb(connection: &Connection,
-	cmd_buf: VkCommandBuffer, vertex_buffer: VkBuffer,
-	texc_buffer: VkBuffer, texc: bool)
+	cmd_buf: VkCommandBuffer, vertex_buffers: &[VkBuffer])
 {
-	if texc {
-		(connection.bind_vb)(
-			cmd_buf,
-			0,
-			2,
-			[vertex_buffer, texc_buffer].as_ptr(),
-			[0, 0].as_ptr(),
-		);
-	} else {
-		(connection.bind_vb)(
-			cmd_buf,
-			0,
-			1,
-			[vertex_buffer].as_ptr(),
-			[0].as_ptr(),
-		);
-	}
+	const OFFSETS1 : [u64; 1] = [0];
+	const OFFSETS2 : [u64; 2] = [0, 0];
+	const OFFSETS3 : [u64; 3] = [0, 0, 0];
+
+	let length = vertex_buffers.len();
+
+	(connection.bind_vb)(
+		cmd_buf,
+		0,
+		length as u32,
+		vertex_buffers.as_ptr(),
+		match length {
+			1 => OFFSETS1.as_ptr(),
+			2 => OFFSETS2.as_ptr(),
+			3 => OFFSETS3.as_ptr(), 
+			_ => panic!("Wrong number of vertex buffers (Not 1-3)"),
+		},
+	);
 }
 
 pub unsafe fn cmd_draw(connection: &Connection, cmd_buf: VkCommandBuffer,
@@ -1793,6 +1793,12 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 						stride: (mem::size_of::<f32>() * 4) as u32,
 						input_rate: VkVertexInputRate::Vertex,
 					},
+					// Color
+					VkVertexInputBindingDescription {
+						binding: 2,
+						stride: (mem::size_of::<f32>() * 4) as u32,
+						input_rate: VkVertexInputRate::Vertex,
+					},
 				].as_ptr(),
 				vertex_attribute_description_count: shader.vertex_buffers,
 				vertex_attribute_descriptions: [
@@ -1806,7 +1812,13 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 						location: 1,
 						binding: 1,
 						format: VkFormat::R32g32b32a32Sfloat,
-						offset: 0, //4 * sizeof(float),
+						offset: 0,
+					},
+					VkVertexInputAttributeDescription {
+						location: 2,
+						binding: 2,
+						format: VkFormat::R32g32b32a32Sfloat,
+						offset: 0,
 					},
 				].as_ptr(),
 			},

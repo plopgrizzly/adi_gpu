@@ -19,7 +19,7 @@ pub fn resize(display: &mut adi_gpu::Display, image_tex: adi_gpu::Texture,
 
 	// square
 	adi_gpu::ShapeBuilder::new(SQUARE_MODEL)
-		.push_solid(display, adi_gpu::Color(0.5, 1.0, 0.5, 0.5))
+		.push_solid(display, [0.5, 1.0, 0.5, 0.5])
 		.transform(display, &adi_gpu::Transform::new()
 			.translate(0.0, 0.0, 0.5).rotate(0.25, 0.0, 0.0));
 	// image
@@ -39,11 +39,27 @@ pub fn resize(display: &mut adi_gpu::Display, image_tex: adi_gpu::Texture,
 		]);
 	// new!
 	adi_gpu::ShapeBuilder::new(IMAGE_VERTICES)
-		.push_faded(display, image_tex, IMAGE_TEXCOORDS, 0.5);
+		.push_faded(display, image_tex, IMAGE_TEXCOORDS, 0.5)
+		.transform(display, &adi_gpu::Transform::new()
+			.translate(1.0, 1.0, 0.0));
 	// new!
 	adi_gpu::ShapeBuilder::new(IMAGE_VERTICES)
 		.push_tinted(display, image_tex, IMAGE_TEXCOORDS,
-			adi_gpu::Color(1.0, 1.0, 0.0, 0.5));
+			[1.0, 1.0, 0.0, 1.0])
+		.transform(display, &adi_gpu::Transform::new()
+			.translate(1.5, 1.5, 0.0));
+	// new!
+	adi_gpu::ShapeBuilder::new(IMAGE_VERTICES)
+		.push_complex(display, image_tex, IMAGE_TEXCOORDS, &[
+			1.0, 0.0, 0.0, 1.0,
+			0.0, 0.0, 1.0, 1.0,
+			0.0, 1.0, 0.0, 1.0,
+
+			0.0, 0.0, 1.0, 1.0,
+			1.0, 0.0, 0.0, 1.0,
+			0.0, 1.0, 0.0, 1.0 ])
+		.transform(display, &adi_gpu::Transform::new()
+			.translate(1.0, 1.5, 0.0));
 }
 
 pub fn update(_: &mut adi_gpu::Display) {

@@ -2,7 +2,7 @@
 // Copyright (c) 2017 Plop Grizzly, Jeron Lau <jeron.lau@plopgrizzly.com>
 // Licensed under the MIT LICENSE
 //
-// src/native_renderer/vulkan/glsl/texture.frag
+// src/native_renderer/vulkan/glsl/faded.frag
 
 #version 450
 #extension GL_ARB_separate_shader_objects : enable

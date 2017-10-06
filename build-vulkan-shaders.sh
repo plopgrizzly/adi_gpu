@@ -39,6 +39,21 @@ glslangValidator $SRC/texture.vert -V -o $OUT_UNOPTIMIZED/texture-vert.spv
 $SPIRV_OPT $OUT_UNOPTIMIZED/texture-frag.spv -o $OUT_OPTIMIZED/texture-frag.spv
 $SPIRV_OPT $OUT_UNOPTIMIZED/texture-vert.spv -o $OUT_OPTIMIZED/texture-vert.spv
 
+glslangValidator $SRC/faded.frag -V -o $OUT_UNOPTIMIZED/faded-frag.spv
+glslangValidator $SRC/faded.vert -V -o $OUT_UNOPTIMIZED/faded-vert.spv
+$SPIRV_OPT $OUT_UNOPTIMIZED/faded-frag.spv -o $OUT_OPTIMIZED/faded-frag.spv
+$SPIRV_OPT $OUT_UNOPTIMIZED/faded-vert.spv -o $OUT_OPTIMIZED/faded-vert.spv
+
+glslangValidator $SRC/tinted.frag -V -o $OUT_UNOPTIMIZED/tinted-frag.spv
+glslangValidator $SRC/tinted.vert -V -o $OUT_UNOPTIMIZED/tinted-vert.spv
+$SPIRV_OPT $OUT_UNOPTIMIZED/tinted-frag.spv -o $OUT_OPTIMIZED/tinted-frag.spv
+$SPIRV_OPT $OUT_UNOPTIMIZED/tinted-vert.spv -o $OUT_OPTIMIZED/tinted-vert.spv
+
+glslangValidator $SRC/complex.frag -V -o $OUT_UNOPTIMIZED/complex-frag.spv
+glslangValidator $SRC/complex.vert -V -o $OUT_UNOPTIMIZED/complex-vert.spv
+$SPIRV_OPT $OUT_UNOPTIMIZED/complex-frag.spv -o $OUT_OPTIMIZED/complex-frag.spv
+$SPIRV_OPT $OUT_UNOPTIMIZED/complex-vert.spv -o $OUT_OPTIMIZED/complex-vert.spv
+
 spirv-remap --map all --dce all --strip-all --input $OUT_OPTIMIZED/*.spv --output $OUT_RELEASE/
 
 cp $OUT_RELEASE/* src/native_renderer/vulkan/res/

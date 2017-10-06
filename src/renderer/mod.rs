@@ -18,6 +18,11 @@ mod ffi;
 use self::ffi::vulkan::ffi::types::*;
 use self::ffi::vulkan::ffi::Connection;
 
+#[repr(C)] struct TransformAndFadeUniform {
+	mat4: [f32; 16],
+	fade: f32,
+}
+
 #[repr(C)] struct TransformAndColorUniform {
 	mat4: [f32; 16],
 	vec4: [f32; 4],
@@ -69,16 +74,15 @@ pub struct Shader {
 impl Shader {
 	pub fn new(connection: &Connection, device: VkDevice,
 		vert: &'static [u8], frag: &'static [u8], textures: u32,
-		vertex_buffers: bool) -> Shader
+		vertex_buffers: u32) -> Shader
 	{
-		let (vertex, fragment) = unsafe {		
+		let (vertex, fragment) = unsafe {
 			vulkan::ffi::new_shader(connection, device, vert, frag)
 		};
 
 		// TODO: has_data
 		Shader {
-			vertex, fragment, textures, has_data: 0,
-			vertex_buffers: if vertex_buffers { 2 } else { 1 }, 
+			vertex, fragment, textures, vertex_buffers, has_data: 0 
 		}
 	}
 }
@@ -106,19 +110,12 @@ pub struct Texture {
 	staged: bool,
 }
 
-#[repr(C)]
-pub struct VwShape {
-	vertex_buffer_memory: VkDeviceMemory,
-	vertex_input_buffer: VkBuffer,
-	vertice_count: u32,
-}
-
 pub struct Shape {
-	shape: VwShape,
-	has2vbs: bool,
+	vertex_buffers: Vec<VkBuffer>,
+	vertex_memory: Vec<VkDeviceMemory>,
+	vertice_count: u32,
+	num_vbs: u32,
 	instance: VwInstance,
-	texc_buffer_memory: VkDeviceMemory,
-	texc_input_buffer: VkBuffer,
 }
 
 // TODO
@@ -520,6 +517,9 @@ pub struct Renderer {
 	style_solid: Style,
 	style_texture: Style,
 	style_gradient: Style,
+	style_faded: Style,
+	style_tinted: Style,
+	style_complex: Style,
 	projection: ::Transform,
 }
 
@@ -535,13 +535,22 @@ impl Renderer {
 		let shadev = vec![
 			Shader::new(&connection, vw.device,
 				include_bytes!("../native_renderer/vulkan/res/solid-vert.spv"),
-				include_bytes!("../native_renderer/vulkan/res/solid-frag.spv"), 0, false),
+				include_bytes!("../native_renderer/vulkan/res/solid-frag.spv"), 0, 1),
 			Shader::new(&connection, vw.device,
 				include_bytes!("../native_renderer/vulkan/res/texture-vert.spv"),
-				include_bytes!("../native_renderer/vulkan/res/texture-frag.spv"), 1, true),
+				include_bytes!("../native_renderer/vulkan/res/texture-frag.spv"), 1, 2),
 			Shader::new(&connection, vw.device,
 				include_bytes!("../native_renderer/vulkan/res/gradient-vert.spv"),
-				include_bytes!("../native_renderer/vulkan/res/gradient-frag.spv"), 0, true),
+				include_bytes!("../native_renderer/vulkan/res/gradient-frag.spv"), 0, 2),
+			Shader::new(&connection, vw.device,
+				include_bytes!("../native_renderer/vulkan/res/faded-vert.spv"),
+				include_bytes!("../native_renderer/vulkan/res/faded-frag.spv"), 1, 2),
+			Shader::new(&connection, vw.device,
+				include_bytes!("../native_renderer/vulkan/res/tinted-vert.spv"),
+				include_bytes!("../native_renderer/vulkan/res/tinted-frag.spv"), 1, 2),
+			Shader::new(&connection, vw.device,
+				include_bytes!("../native_renderer/vulkan/res/complex-vert.spv"),
+				include_bytes!("../native_renderer/vulkan/res/complex-frag.spv"), 1, 3),
 		];
 
 		let mut styles = Vec::with_capacity(shadev.len());
@@ -561,7 +570,8 @@ impl Renderer {
 		Renderer {
 			vw, connection, shapes, projection,
 			style_solid: styles[0], style_texture: styles[1],
-			style_gradient: styles[2],
+			style_gradient: styles[2], style_faded: styles[3],
+			style_tinted: styles[4], style_complex: styles[5],
 		}
 	}
 
@@ -595,8 +605,7 @@ impl Renderer {
 			unsafe {
 				vulkan::ffi::cmd_bind_vb(&self.connection,
 					self.vw.command_buffer,
-					shape.shape.vertex_input_buffer,
-					shape.texc_input_buffer, shape.has2vbs);
+					shape.vertex_buffers.as_slice());
 
 				vulkan::ffi::cmd_bind_pipeline(&self.connection,
 					self.vw.command_buffer,
@@ -610,7 +619,7 @@ impl Renderer {
 
 			vulkan::cmd_draw(&self.connection,
 				self.vw.command_buffer,
-				shape.shape.vertice_count);
+				shape.vertice_count);
 		}
 
 		unsafe {
@@ -644,7 +653,7 @@ impl Renderer {
 		texcoords: &[f32]) -> usize
 	{
 		let size = vertices.len() as u32;
-		let has2vbs = true;
+		let num_vbs = 2;
 
 		let (vertex_input_buffer, vertex_buffer_memory) = unsafe {
 			vulkan::ffi::new_shape(
@@ -662,11 +671,6 @@ impl Renderer {
 				self.vw.gpu,
 				texcoords,
 			)
-		};
-
-		let shape = VwShape {
-			vertex_buffer_memory, vertex_input_buffer,
-			vertice_count: size / 4,
 		};
 
 		let a = self.shapes.len();
@@ -694,14 +698,26 @@ impl Renderer {
 			mem::size_of::<TransformUniform>());
 
 		println!("PUSH SHAPE");
-		self.shapes.push(Shape { shape, has2vbs, instance, texc_input_buffer, texc_buffer_memory });
+
+		let vertex_buffers = [vertex_input_buffer, texc_input_buffer]
+			.to_vec();
+		let vertex_memory = [vertex_buffer_memory, texc_buffer_memory]
+			.to_vec();
+
+		self.shapes.push(Shape {
+			num_vbs,
+			instance,
+			vertex_buffers,
+			vertex_memory,
+			vertice_count: size / 4,
+		});
 
 		a
 	}
 
-	pub fn solid(&mut self, vertices: &[f32], color: ::Color) -> usize {
+	pub fn solid(&mut self, vertices: &[f32], color: [f32; 4]) -> usize {
 		let size = vertices.len() as u32;
-		let has2vbs = false;
+		let num_vbs = 1;
 
 		let (vertex_input_buffer, vertex_buffer_memory) = unsafe {
 			vulkan::ffi::new_shape(
@@ -712,15 +728,10 @@ impl Renderer {
 			)
 		};
 
-		let shape = VwShape {
-			vertex_buffer_memory, vertex_input_buffer,
-			vertice_count: size / 4,
-		};
-
 		let a = self.shapes.len();
 
 		let matrix = TransformAndColorUniform {
-			vec4: [color.0, color.1, color.2, color.3],
+			vec4: color,
 			mat4: self.projection.0,
 		};
 
@@ -742,11 +753,16 @@ impl Renderer {
 			instance.uniform_memory, &matrix,
 			mem::size_of::<TransformAndColorUniform>());
 
-		let texc_input_buffer = unsafe { mem::zeroed() };
-		let texc_buffer_memory = unsafe { mem::zeroed() };
+		let vertex_buffers = [vertex_input_buffer].to_vec();
+		let vertex_memory = [vertex_buffer_memory].to_vec();
 
-		println!("PUSH SHAPE");
-		self.shapes.push(Shape { shape, has2vbs, instance, texc_input_buffer, texc_buffer_memory });
+		self.shapes.push(Shape {
+			num_vbs,
+			instance,
+			vertex_buffers,
+			vertex_memory,
+			vertice_count: size / 4,
+		});
 
 		a
 	}
@@ -755,7 +771,7 @@ impl Renderer {
 		println!("GRADIENT: {:?}", colors);
 
 		let size = vertices.len() as u32;
-		let has2vbs = true;
+		let num_vbs = 2;
 
 		let (vertex_input_buffer, vertex_buffer_memory) = unsafe {
 			vulkan::ffi::new_shape(
@@ -773,11 +789,6 @@ impl Renderer {
 				self.vw.gpu,
 				colors,
 			)
-		};
-
-		let shape = VwShape {
-			vertex_buffer_memory, vertex_input_buffer,
-			vertice_count: size / 4,
 		};
 
 		let a = self.shapes.len();
@@ -805,7 +816,228 @@ impl Renderer {
 			mem::size_of::<TransformUniform>());
 
 		println!("PUSH GRADIENT");
-		self.shapes.push(Shape { shape, has2vbs, instance, texc_input_buffer, texc_buffer_memory });
+
+		let vertex_buffers = [vertex_input_buffer, texc_input_buffer]
+			.to_vec();
+		let vertex_memory = [vertex_buffer_memory, texc_buffer_memory]
+			.to_vec();
+
+		self.shapes.push(Shape {
+			num_vbs,
+			instance,
+			vertex_buffers,
+			vertex_memory,
+			vertice_count: size / 4,
+		});
+
+		a
+	}
+
+	pub fn faded(&mut self, vertices: &[f32], texture: Texture,
+		texcoords: &[f32], fade_factor: f32) -> usize
+	{
+		let size = vertices.len() as u32;
+		let num_vbs = 2;
+
+		let (vertex_input_buffer, vertex_buffer_memory) = unsafe {
+			vulkan::ffi::new_shape(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				vertices,
+			)
+		};
+
+		let (texc_input_buffer, texc_buffer_memory) = unsafe {
+			vulkan::ffi::new_shape(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				texcoords,
+			)
+		};
+
+		let a = self.shapes.len();
+
+		let uniform = TransformAndFadeUniform {
+			mat4: self.projection.0,
+			fade: fade_factor,
+		};
+
+		// Add an instance
+		let instance = unsafe {
+			vulkan::ffi::vw_instance_new(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				self.style_faded,
+				mem::size_of::<TransformAndFadeUniform>(),
+				texture.view,
+				texture.sampler,
+				1, // 1 texure
+			)
+		};
+
+		vulkan::copy_memory(&self.connection, self.vw.device,
+			instance.uniform_memory, &uniform,
+			mem::size_of::<TransformAndFadeUniform>());
+
+		println!("PUSH SHAPE");
+
+		let vertex_buffers = [vertex_input_buffer, texc_input_buffer]
+			.to_vec();
+		let vertex_memory = [vertex_buffer_memory, texc_buffer_memory]
+			.to_vec();
+
+		self.shapes.push(Shape {
+			num_vbs,
+			instance,
+			vertex_buffers,
+			vertex_memory,
+			vertice_count: size / 4,
+		});
+
+		a
+	}
+
+	pub fn tinted(&mut self, vertices: &[f32], texture: Texture,
+		texcoords: &[f32], color: [f32; 4]) -> usize
+	{
+		let size = vertices.len() as u32;
+		let num_vbs = 2;
+
+		let (vertex_input_buffer, vertex_buffer_memory) = unsafe {
+			vulkan::ffi::new_shape(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				vertices,
+			)
+		};
+
+		let (texc_input_buffer, texc_buffer_memory) = unsafe {
+			vulkan::ffi::new_shape(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				texcoords,
+			)
+		};
+
+		let a = self.shapes.len();
+
+		let uniform = TransformAndColorUniform {
+			mat4: self.projection.0,
+			vec4: color,
+		};
+
+		// Add an instance
+		let instance = unsafe {
+			vulkan::ffi::vw_instance_new(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				self.style_tinted,
+				mem::size_of::<TransformAndColorUniform>(),
+				texture.view,
+				texture.sampler,
+				1, // 1 texure
+			)
+		};
+
+		vulkan::copy_memory(&self.connection, self.vw.device,
+			instance.uniform_memory, &uniform,
+			mem::size_of::<TransformAndColorUniform>());
+
+		println!("PUSH SHAPE");
+
+		let vertex_buffers = [vertex_input_buffer, texc_input_buffer]
+			.to_vec();
+		let vertex_memory = [vertex_buffer_memory, texc_buffer_memory]
+			.to_vec();
+
+		self.shapes.push(Shape {
+			num_vbs,
+			instance,
+			vertex_buffers,
+			vertex_memory,
+			vertice_count: size / 4,
+		});
+
+		a
+	}
+
+	pub fn complex(&mut self, vertices: &[f32], texture: Texture,
+		texcoords: &[f32], colors: &[f32]) -> usize
+	{
+		let size = vertices.len() as u32;
+		let num_vbs = 3;
+
+		let (vertex_input_buffer, vertex_buffer_memory) = unsafe {
+			vulkan::ffi::new_shape(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				vertices,
+			)
+		};
+
+		let (texc_input_buffer, texc_buffer_memory) = unsafe {
+			vulkan::ffi::new_shape(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				texcoords,
+			)
+		};
+
+		let (color_input_buffer, color_buffer_memory) = unsafe {
+			vulkan::ffi::new_shape(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				colors,
+			)
+		};
+
+		let a = self.shapes.len();
+
+		let uniform = TransformUniform {
+			mat4: self.projection.0,
+		};
+
+		// Add an instance
+		let instance = unsafe {
+			vulkan::ffi::vw_instance_new(
+				&self.connection,
+				self.vw.device,
+				self.vw.gpu,
+				self.style_complex,
+				mem::size_of::<TransformUniform>(),
+				texture.view,
+				texture.sampler,
+				1, // 1 texure
+			)
+		};
+
+		vulkan::copy_memory(&self.connection, self.vw.device,
+			instance.uniform_memory, &uniform,
+			mem::size_of::<TransformUniform>());
+
+		println!("PUSH SHAPE");
+
+		let vertex_buffers = [vertex_input_buffer, texc_input_buffer,
+			color_input_buffer].to_vec();
+		let vertex_memory = [vertex_buffer_memory, texc_buffer_memory,
+			color_buffer_memory].to_vec();
+
+		self.shapes.push(Shape {
+			num_vbs,
+			instance,
+			vertex_buffers,
+			vertex_memory,
+			vertice_count: size / 4,
+		});
 
 		a
 	}
