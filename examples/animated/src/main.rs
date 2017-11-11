@@ -67,18 +67,16 @@ pub fn update(_: &mut adi_gpu::Display) {
 }
 
 fn main() {
-	let display_icon = aci_png::decode(include_bytes!("../res/icon.png"))
-		.unwrap();
-
 	let mut display = adi_gpu::Display::new("adi_gpu Animated Example",
-		&display_icon);
+		aci_png::decode(include_bytes!("../res/test.png")).unwrap());
 
 	let mut queue = adi_gpu::input::Queue::new();
 
-	let logo_texture = adi_gpu::Texture::new(&mut display, display_icon.as_slice());
+	let logo_texture = adi_gpu::Texture::new(&mut display,
+		aci_png::decode(include_bytes!("../res/icon.png")).unwrap());
 	let plopgrizzly_texture = adi_gpu::Texture::new(&mut display,
 		aci_png::decode(include_bytes!("../res/plopgrizzly.png"))
-			.unwrap().as_slice());
+			.unwrap());
 //	let test_texture = display.push_texture(aci_png::decode(
 //		include_bytes!("../res/test.png")).unwrap());
 

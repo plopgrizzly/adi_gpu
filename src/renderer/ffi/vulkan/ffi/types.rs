@@ -649,6 +649,11 @@ pub type VkSampleMask = u32;
 	pub pp_enabled_extension_names: *const *const i8,
 }
 
+#[repr(C)] #[allow(dead_code)] pub enum VkIndexType {
+	Uint16 = 0,
+	Uint32 = 1,
+}
+
 #[repr(C)] #[allow(dead_code)] pub enum VkBorderColor {
 	FloatTransparentBlack = 0,
 	IntTransparentBlack = 1,
@@ -817,6 +822,7 @@ pub type VkSampleMask = u32;
 	IndexBufferBit = 0x00000040,
 	VertexBufferBit = 0x00000080,
 	IndirectBufferBit = 0x00000100,
+	VertexIndexBufferBit = 0x00000040 | 0x00000080,
 }
 
 #[repr(C)] #[allow(dead_code)] pub enum VkDescriptorType {
@@ -1318,7 +1324,7 @@ impl fmt::Display for VkResult {
 impl VkResult {
 	/// Panic with error if not `VkResult::Success`.
 	pub fn unwrap(self) -> () {
-		if self != VkResult::Success {
+		if self != VkResult::Success && self != VkResult::Incomplete {
 			panic!("Failed: {}", self);
 		}
 	}

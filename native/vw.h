@@ -51,13 +51,13 @@ typedef struct {
 	VkPipelineLayout pipeline_layout;
 } vw_pipeline_t;
 
-typedef struct {
+/*typedef struct {
 	VkBuffer matrix_buffer;
 	VkDeviceMemory uniform_memory;
 	VkDescriptorSet desc_set;
 	VkDescriptorPool desc_pool;
 	vw_pipeline_t pipeline;
-} vw_instance_t;
+} vw_instance_t;*/
 
 typedef struct {
 	VkDeviceMemory vertex_buffer_memory;

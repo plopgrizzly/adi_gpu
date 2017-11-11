@@ -1,23 +1,18 @@
-# Contributing
+# Plop Grizzly Contributing Guidelines v1.1.0
+Want to contribute to the Aldaron's Device Interface / GPU?
+Here's how to get started!
 
-Want to contribute to the Willow Graphics API?  Here's how you get started!
+## Opening an Issue
+If you'd like to report a bug, request a feature, or request support for a system, then you can open an issue.
+After that, follow the directions presented to you.
 
-## BUG REPORTS
-If you want to report a bug, open an issue.
-Make sure to include the target platform.
-Include a code sample and/or screenshot if applicable.
+## Resolving an Issue
+If you have found an issue that you'd like to resolve, create a pull request.
+Please keep consistent to the code style of the project.
+You can find the rules on how Plop Grizzly formats code [here](http://plopgrizzly.com/dev_guidelines).
+Plop Grizzly reserves the right to use any code from pull requests on this project for any purpose.
 
-## BUG FIXES
-If you have fixed a bug in one of the bug reports, make a pull request for it to be reviewed.
-
-## FEATURE REQUESTS
-If you want to request a feature, all you have to do is open an issue.
-
-## FEATURE PR
-If you've added a feature from one of the feature requests, make a pull request for it to be reviewed.
-
-## SUPPORT REQUEST
-If you want a platform and/or backend to be supported that currently isn't, you can open a pull request.
-
-## SUPPORT PR
-If you've added platform of backend support, make a pull request for it to be reviewed.
+## Questions
+If you have any questions about the contributing process, or would like to communicate about it, contact me at jeron.lau@plopgrizzly.com.
+All help in developing Plop Grizzly's projects is greatly appreciated.
+All developers who have contributed will have their name and email added to the Cargo.toml "authors" section.

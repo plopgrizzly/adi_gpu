@@ -12,6 +12,7 @@
 #[macro_use]
 extern crate ami;
 extern crate awi;
+extern crate afi;
 
 /// Transform represents a transformation matrix.
 #[must_use]
@@ -39,10 +40,12 @@ pub struct Display {
 impl Display {
 	/// Connect to the display as a window with a name and icon.  Icon is in
 	/// aci image format: `[ width, height, bgra pixels ]`.
-	pub fn new(name: &str, icon: &Vec<u32>) -> Display {
+	pub fn new(name: &str, icon: afi::Graphic) -> Display {
 		let window = awi::Window::new(name, icon);
 		let renderer = renderer::Renderer::new(name,
 			window.get_connection());
+
+		renderer.camera(&Transform::new());
 
 		Display { window, renderer }
 	}
@@ -56,20 +59,64 @@ impl Display {
 			self.renderer.resize(self.window.get_dimensions());
 		}
 	}
+
+	/// Update the camera position and angle.
+	pub fn camera(&self, xyz: (f32,f32,f32), rotate_xyz: (f32,f32,f32)) {
+		let camera_transform = Transform::new()
+			.translate(-xyz.0, -xyz.1, -xyz.2)
+			.rotate(-rotate_xyz.0, -rotate_xyz.1, -rotate_xyz.2);
+
+		self.renderer.camera(&camera_transform);
+	}
 }
+
+#[derive(Copy, Clone)]
+pub struct Model(usize);
+
+#[derive(Copy, Clone)]
+pub struct Gradient(usize);
+
+#[derive(Copy, Clone)]
+pub struct TexCoords(usize);
 
 impl Texture {
 	/// Create a new texture.
-	pub fn new(display: &mut Display, image_data: &[u32]) -> Texture {
+	pub fn new(display: &mut Display, image_data: afi::Graphic) -> Texture {
+		let image_data = image_data.as_slice();
+
 		display.renderer.texture(image_data[0], image_data[1],
 			&image_data[2..])
 	}
 }
 
+impl Model {
+	/// Create a new model.
+	pub fn new(display: &mut Display, vertices: &[f32], indices: &[u32])
+		-> Model
+	{
+		Model(display.renderer.model(vertices, indices))
+	}
+}
+
+impl Gradient {
+	/// Create a new gradient.
+	pub fn new(display: &mut Display, colors: &[f32]) -> Gradient {
+		Gradient(display.renderer.colors(colors))
+	}
+}
+
+impl TexCoords {
+	/// Create new texture coordinates.
+	pub fn new(display: &mut Display, texcoords: &[f32]) -> TexCoords {
+		TexCoords(display.renderer.texcoords(texcoords))
+	}
+}
+
+/// A renderable object that exists on the `Display`.
 pub struct Shape(usize);
 
 impl Shape {
-	/// `Transform` the `Shape`.
+	/// `Transform` the `Shape`
 	pub fn transform(&self, display: &mut Display, transform: &Transform)
 		-> Shape
 	{
@@ -77,18 +124,19 @@ impl Shape {
 	}
 }
 
-pub struct ShapeBuilder<'a> {
-	vertices: &'a [f32],
+/// Builder for `Shape`
+pub struct ShapeBuilder {
+	vertices: usize,
 }
 
-impl<'a> ShapeBuilder<'a> {
-	/// Obtain a new `ShapeBuilder` with `vertices`.
+impl ShapeBuilder {
+	/// Obtain a new `ShapeBuilder` with `vertices`
 	#[inline(always)]
-	pub fn new(vertices: &'a [f32]) -> ShapeBuilder {
-		ShapeBuilder { vertices }
+	pub fn new(vertices: Model) -> ShapeBuilder {
+		ShapeBuilder { vertices: vertices.0 }
 	}
 
-	/// Push a shape with a solid color.
+	/// Push a shape with a solid color
 	#[inline(always)]
 	pub fn push_solid(&self, display: &mut Display, color: [f32; 4])
 		-> Shape
@@ -96,50 +144,54 @@ impl<'a> ShapeBuilder<'a> {
 		Shape(display.renderer.solid(self.vertices, color))
 	}
 
-	/// Push a shape with shaded by a gradient (1 color per vertex).
+	/// Push a shape with shaded by a gradient (1 color per vertex)
 	#[inline(always)]
-	pub fn push_gradient(&self, display: &mut Display, color: &[f32])
+	pub fn push_gradient(&self, display: &mut Display, colors: Gradient)
 		-> Shape
 	{
-		Shape(display.renderer.gradient(self.vertices, color))
+		Shape(display.renderer.gradient(self.vertices, colors.0))
 	}
 
-	/// Push a shape with a texture and texture coordinates.
-	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`.
+	/// Push a shape with a texture and texture coordinates
+	///
+	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`
 	#[inline(always)]
 	pub fn push_texture(&self, display: &mut Display, texture: Texture,
-		tc: &[f32]) -> Shape
+		tc: TexCoords) -> Shape
 	{
-		Shape(display.renderer.textured(self.vertices, texture, tc))
+		Shape(display.renderer.textured(self.vertices, texture, tc.0))
 	}
 
-	/// Push a shape with a texture, texture coordinates and alpha.
-	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`.
+	/// Push a shape with a texture, texture coordinates and alpha
+	///
+	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`
 	#[inline(always)]
 	pub fn push_faded(&self, display: &mut Display, texture: Texture,
-		tc: &[f32], alpha: f32) -> Shape
+		tc: TexCoords, alpha: f32) -> Shape
 	{
-		Shape(display.renderer.faded(self.vertices, texture, tc, alpha))
+		Shape(display.renderer.faded(self.vertices, texture, tc.0, alpha))
 	}
 
-	/// Push a shape with a texture and texture coordinates and tint.
-	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`.
+	/// Push a shape with a texture and texture coordinates and tint
+	///
+	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`
 	#[inline(always)]
 	pub fn push_tinted(&self, display: &mut Display, texture: Texture,
-		tc: &[f32], tint: [f32; 4]) -> Shape
+		tc: TexCoords, tint: [f32; 4]) -> Shape
 	{
-		Shape(display.renderer.tinted(self.vertices, texture, tc, tint))
+		Shape(display.renderer.tinted(self.vertices, texture, tc.0, tint))
 	}
 
 	/// Push a shape with a texture and texture coordinates and tint per
-	/// vertex.
-	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`.
+	/// vertex
+	///
+	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`
 	#[inline(always)]
 	pub fn push_complex(&self, display: &mut Display, texture: Texture,
-		tc: &[f32], tints: &[f32]) -> Shape
+		tc: TexCoords, tints: Gradient) -> Shape
 	{
-		Shape(display.renderer.complex(self.vertices, texture, tc,
-			tints))
+		Shape(display.renderer.complex(self.vertices, texture, tc.0,
+			tints.0))
 	}
 }
 

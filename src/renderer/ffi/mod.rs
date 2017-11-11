@@ -17,6 +17,7 @@ pub mod metal;
 pub mod willow;
 
 #[cfg(any(target_os = "windows", target_os = "linux", target_os = "android"))]
+#[allow(unused)]
 pub enum NativeRenderer {
 	OpenGL(opengl::OpenGLRenderer),
 	Vulkan(vulkan::VulkanRenderer),

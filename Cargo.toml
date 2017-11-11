@@ -46,7 +46,8 @@ build = "build.rs"
 ################################################################################
 
 [dependencies]
-ami = { path = "../ami" } # "^0.4"
+afi = "^0.1"
+ami = "^0.5"
 awi = { path = "../awi" }
 
 [build-dependencies.gcc]

@@ -4,8 +4,6 @@
 //
 // src/renderer/ffi/vulkan/mod.rs
 
-use std::ptr;
-
 use ami::*;
 
 pub mod ffi;
@@ -20,6 +18,7 @@ pub struct VulkanRenderer {
 }
 
 impl ::RenderOps for VulkanRenderer {
+	#[allow(unused)]
 	fn new(app_name: &str, window: ::awi::WindowConnection) -> Self {
 		let native = vulkan::Vulkan::new(app_name).unwrap();
 
@@ -103,9 +102,10 @@ pub fn copy_memory_pitched<T>(connection: &ffi::Connection, vk_device: VkDevice,
 }
 
 pub fn cmd_draw(connection: &ffi::Connection, cmd_buffer: VkCommandBuffer,
-	vertex_count: u32)
+	vertex_count: u32, vertex_offset: i32)
 {
 	unsafe {
-		ffi::cmd_draw(connection, cmd_buffer, vertex_count, 1, 0, 0);
+		ffi::cmd_draw(connection, cmd_buffer, vertex_count, 1, 0,
+			vertex_offset, 0);
 	}
 }

@@ -7,6 +7,7 @@
 pub struct OpenGLRenderer { }
 
 impl ::RenderOps for OpenGLRenderer {
+	#[allow(unused)]
 	fn new(app_name: &str, window: ::awi::WindowConnection) -> Self {
 		OpenGLRenderer { }
 	}

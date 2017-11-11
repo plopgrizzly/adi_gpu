@@ -7,6 +7,7 @@
 pub struct WillowRenderer { }
 
 impl ::RenderOps for WillowRenderer {
+	#[allow(unused)]
 	fn new(app_name: &str, window: ::awi::WindowConnection) -> Self {
 		WillowRenderer { }
 	}
