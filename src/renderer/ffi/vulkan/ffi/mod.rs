@@ -305,6 +305,7 @@ unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
 		}
 	).unwrap();
 	let s3 = CString::new("VK_EXT_debug_report").unwrap();
+	let extnames = [s1.as_ptr(), s2.as_ptr(), s3.as_ptr()];
 
 	let mut instance = mem::uninitialized();
 
@@ -335,14 +336,7 @@ unsafe fn create_instance(vk_create_instance: unsafe extern "system" fn(
 			enabled_extension_count: {
 				if cfg!(feature = "checks") { 3 } else { 2 }
 			},
-			pp_enabled_extension_names: {
-				if cfg!(feature = "checks") {
-					[s1.as_ptr(), s2.as_ptr(), s3.as_ptr()]
-						.as_ptr()
-				} else {
-					[s1.as_ptr(), s2.as_ptr()].as_ptr()
-				}	
-			},
+			pp_enabled_extension_names: extnames.as_ptr(),
 		}, null_mut!(), &mut instance
 	).unwrap();
 
@@ -1412,7 +1406,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	(connection.drop_swapchain)(device, swapchain, ptr::null());
 }
 
-// TODO: Move to ali_vulkan
+// TODO: Move to asi_vulkan
 struct DescriptorSetWriter {
 	buffer_infos: [VkDescriptorBufferInfo; 255],
 	image_infos: [VkDescriptorImageInfo; 255],
@@ -1420,7 +1414,7 @@ struct DescriptorSetWriter {
 	nwrites: u8,
 }
 
-// TODO: Move to ali_vulkan
+// TODO: Move to asi_vulkan
 impl DescriptorSetWriter {
 	/// Create a new DescriptorSetWriter.
 	#[inline(always)]
@@ -1520,10 +1514,10 @@ pub(in renderer) unsafe fn txuniform(connection: &Connection, device: VkDevice,
 	writer.update_descriptor_sets(connection, device);
 }
 
-// TODO: Move to ali_vulkan
+// TODO: Move to asi_vulkan
 pub(in renderer) struct GpuMemory { pub memory: VkDeviceMemory }
 
-// TODO: Move to ali_vulkan
+// TODO: Move to asi_vulkan
 impl GpuMemory {
 	/// Allocate memory in a GPU buffer.
 	#[inline(always)]
@@ -1572,10 +1566,10 @@ impl GpuMemory {
 	}
 }
 
-// TODO: Move to ali_vulkan
+// TODO: Move to asi_vulkan
 pub(in renderer) struct GpuBuffer { buffer: VkBuffer }
 
-// TODO: Move to ali_vulkan
+// TODO: Move to asi_vulkan
 impl GpuBuffer {
 	/// Create a new buffer on the GPU.
 	#[inline(always)]
@@ -1874,48 +1868,64 @@ pub(in renderer) unsafe fn new_buffer(connection: &Connection, device: VkDevice,
 	(vertex_input_buffer, vertex_buffer_memory)
 }
 
+// TODO: Move to asi_vulkan
+pub struct ShaderModule(
+	VkShaderModule,
+	VkDevice,
+	unsafe extern "system" fn(VkDevice, VkShaderModule, *const Void) -> (),
+);
+
+// TODO: Move to asi_vulkan
+impl ShaderModule {
+	/// Load a new shader module into memory.
+	pub fn new(connection: &Connection, device: VkDevice,
+		spirv_shader: &[u8]) -> ShaderModule
+	{
+		let mut shader = unsafe { mem::uninitialized() };
+
+		unsafe {
+			(connection.new_shademod)(
+				device,
+				&VkShaderModuleCreateInfo {
+					s_type: VkStructureType::ShaderModuleCreateInfo,
+					next: ptr::null(),
+					flags: 0,
+					code_size: spirv_shader.len(),
+					code: spirv_shader.as_ptr(),
+				},
+				ptr::null(),
+				&mut shader
+			).unwrap();
+		}
+
+		ShaderModule(shader, device, connection.drop_shademod)
+	}
+}
+
+// TODO: Move to asi_vulkan
+impl Drop for ShaderModule {
+	fn drop(&mut self) -> () {
+		unsafe {
+			(self.2)(self.1, self.0, ptr::null());
+		}
+	}
+}
+
 pub(in renderer) unsafe fn new_shader(connection: &Connection, device: VkDevice,
 	vertex_shader: &[u8], fragment_shader: &[u8])
-	-> (VkShaderModule, VkShaderModule)
+	-> (ShaderModule, ShaderModule)
 {
-	let mut vertex = mem::uninitialized();
-	let mut fragment = mem::uninitialized();
-
-	// Vertex Shader
-	(connection.new_shademod)(
-		device,
-		&VkShaderModuleCreateInfo {
-			s_type: VkStructureType::ShaderModuleCreateInfo,
-			next: ptr::null(),
-			flags: 0,
-			code_size: vertex_shader.len(),
-			code: vertex_shader.as_ptr(),
-		},
-		ptr::null(),
-		&mut vertex
-	).unwrap();
-
-	// Fragment Shader
-	(connection.new_shademod)(
-		device,
-		&VkShaderModuleCreateInfo {
-			s_type: VkStructureType::ShaderModuleCreateInfo,
-			next: ptr::null(),
-			flags: 0,
-			code_size: fragment_shader.len(),
-			code: fragment_shader.as_ptr(),
-		},
-		ptr::null(),
-		&mut fragment
-	).unwrap();
+	let mut vertex = ShaderModule::new(connection, device, vertex_shader);
+	let mut fragment = ShaderModule::new(connection, device, fragment_shader);
 
 	(vertex, fragment)
 }
 
-pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
+pub(in renderer) fn new_pipeline(connection: &Connection,
 	device: VkDevice, render_pass: VkRenderPass, width: u32, height: u32,
-	shader: ::renderer::Shader) -> ::renderer::Style
-{
+	vertex: &ShaderModule, fragment: &ShaderModule, ntextures: u32,
+	nvbuffers: u32, alpha: bool) -> ::renderer::Style
+{ unsafe {
 	let mut pipeline = mem::uninitialized();
 	let mut pipeline_layout = mem::uninitialized();
 	let mut descsetlayout = mem::uninitialized();
@@ -1937,8 +1947,9 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 			s_type: VkStructureType::DescriptorSetLayoutCreateInfo,
 			next: ptr::null(),
 			flags: 0,
-			binding_count: 2 + shader.textures,
-			bindings: if shader.textures == 0 {
+			binding_count: 2 + ntextures,
+			// TODO: consolidate
+			bindings: if ntextures == 0 {
 				[VkDescriptorSetLayoutBinding {
 					binding: 0,
 					descriptor_type: VkDescriptorType::UniformBuffer,
@@ -2013,7 +2024,7 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 					next: ptr::null(),
 					flags: 0,
 					stage: VkShaderStage::Vertex,
-					module: shader.vertex,
+					module: vertex.0,
 					name: b"main\0".as_ptr(), // shader main function name
 					specialization_info: ptr::null(),
 				},
@@ -2022,7 +2033,7 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 					next: ptr::null(),
 					flags: 0,
 					stage: VkShaderStage::Fragment,
-					module: shader.fragment,
+					module: fragment.0,
 					name: b"main\0".as_ptr(), // shader main function name
 					specialization_info: ptr::null(),
 				},
@@ -2031,7 +2042,7 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 				s_type: VkStructureType::PipelineVertexInputStateCreateInfo,
 				next: ptr::null(),
 				flags: 0,
-				vertex_binding_description_count: shader.vertex_buffers,
+				vertex_binding_description_count: nvbuffers,
 				vertex_binding_descriptions: [
 					// Vertices
 					VkVertexInputBindingDescription {
@@ -2052,7 +2063,7 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 						input_rate: VkVertexInputRate::Vertex,
 					},
 				].as_ptr(),
-				vertex_attribute_description_count: shader.vertex_buffers,
+				vertex_attribute_description_count: nvbuffers,
 				vertex_attribute_descriptions: [
 					VkVertexInputAttributeDescription {
 						location: 0,
@@ -2148,14 +2159,16 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 				logic_op: VkLogicOp::Clear,
 				attachment_count: 1,
 				attachments: &VkPipelineColorBlendAttachmentState {
-					blend_enable: 1,
+					blend_enable: if alpha { 1 } else { 0 },
 					src_color_blend_factor: VkBlendFactor::SrcAlpha,
 					dst_color_blend_factor: VkBlendFactor::OneMinusSrcAlpha,
 					color_blend_op: VkBlendOp::Add,
 					src_alpha_blend_factor: VkBlendFactor::SrcAlpha,
 					dst_alpha_blend_factor: VkBlendFactor::One,
 					alpha_blend_op: VkBlendOp::Add,
-					color_write_mask: 0xf, // RGBA
+					color_write_mask:
+						if alpha { 0b1111 } // RGBA
+						else { 0b111 }, // RGB
 				},
 				blend_constants: [0.0, 0.0, 0.0, 0.0],
 			},
@@ -2178,23 +2191,12 @@ pub(in renderer) unsafe fn new_pipeline(connection: &Connection,
 		&mut pipeline
 	).unwrap();
 
-	(connection.drop_shademod)(
-		device,
-		shader.vertex,
-		ptr::null(),
-	);
-	(connection.drop_shademod)(
-		device,
-		shader.fragment,
-		ptr::null(),
-	);
-
 	::renderer::Style {
 		pipeline,
 		pipeline_layout,
 		descsetlayout,
 	}
-}
+}}
 
 pub unsafe fn destroy_uniforms(connection: &Connection,
 	device: VkDevice, uniform_memory: VkDeviceMemory,

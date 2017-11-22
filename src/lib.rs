@@ -21,6 +21,7 @@ pub struct Transform(pub [f32; 16]);
 mod renderer;
 mod render_ops;
 mod ali_vulkan;
+mod octree;
 
 pub mod input {
 	pub use awi::InputQueue as Queue;
@@ -35,6 +36,8 @@ pub use renderer::Texture;
 pub struct Display {
 	window: awi::Window,
 	renderer: renderer::Renderer,
+	xyz: (f32,f32,f32),
+	rotate_xyz: (f32,f32,f32),
 }
 
 impl Display {
@@ -42,17 +45,22 @@ impl Display {
 	/// aci image format: `[ width, height, bgra pixels ]`.
 	pub fn new(name: &str, icon: afi::Graphic) -> Display {
 		let window = awi::Window::new(name, icon);
-		let renderer = renderer::Renderer::new(name,
+		let mut renderer = renderer::Renderer::new(name,
 			window.get_connection());
 
+//		renderer.init_camera();
 		renderer.camera(&Transform::new());
 
-		Display { window, renderer }
+		Display { window, renderer, xyz: (0.0, 0.0, 0.0),
+			rotate_xyz: (0.0, 0.0, 0.0) }
 	}
 
 	/// Update the display / window.
 	pub fn update(&mut self, input_queue: &mut input::Queue) {
-		self.renderer.update();
+		self.renderer.update(Transform::new()
+			.translate(-self.xyz.0, -self.xyz.1, -self.xyz.2)
+			.rotate(-self.rotate_xyz.0, -self.rotate_xyz.1,
+				-self.rotate_xyz.2).0);
 		self.window.update(input_queue);
 
 		if input_queue.get_resized() {
@@ -61,10 +69,13 @@ impl Display {
 	}
 
 	/// Update the camera position and angle.
-	pub fn camera(&self, xyz: (f32,f32,f32), rotate_xyz: (f32,f32,f32)) {
+	pub fn camera(&mut self, xyz: (f32,f32,f32), rotate_xyz: (f32,f32,f32)) {
 		let camera_transform = Transform::new()
 			.translate(-xyz.0, -xyz.1, -xyz.2)
 			.rotate(-rotate_xyz.0, -rotate_xyz.1, -rotate_xyz.2);
+
+		self.xyz = xyz;
+		self.rotate_xyz = rotate_xyz;
 
 		self.renderer.camera(&camera_transform);
 	}
@@ -113,14 +124,12 @@ impl TexCoords {
 }
 
 /// A renderable object that exists on the `Display`.
-pub struct Shape(usize);
+pub struct Shape(renderer::ShapeHandle);
 
 impl Shape {
 	/// `Transform` the `Shape`
-	pub fn transform(&self, display: &mut Display, transform: &Transform)
-		-> Shape
-	{
-		Shape(display.renderer.transform(self.0, transform))
+	pub fn transform(&self, display: &mut Display, transform: &Transform) {
+		display.renderer.transform(&self.0, transform);
 	}
 }
 
@@ -138,18 +147,21 @@ impl ShapeBuilder {
 
 	/// Push a shape with a solid color
 	#[inline(always)]
-	pub fn push_solid(&self, display: &mut Display, color: [f32; 4])
-		-> Shape
+	pub fn push_solid(&self, display: &mut Display, color: [f32; 4],
+		blending: bool, fancy: bool) -> Shape
 	{
-		Shape(display.renderer.solid(self.vertices, color))
+		Shape(display.renderer.solid(self.vertices, color, blending,
+			fancy))
 	}
 
 	/// Push a shape with shaded by a gradient (1 color per vertex)
 	#[inline(always)]
-	pub fn push_gradient(&self, display: &mut Display, colors: Gradient)
+	pub fn push_gradient(&self, display: &mut Display, colors: Gradient,
+		blending: bool, fancy: bool)
 		-> Shape
 	{
-		Shape(display.renderer.gradient(self.vertices, colors.0))
+		Shape(display.renderer.gradient(self.vertices, colors.0,
+			blending, fancy))
 	}
 
 	/// Push a shape with a texture and texture coordinates
@@ -157,9 +169,10 @@ impl ShapeBuilder {
 	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`
 	#[inline(always)]
 	pub fn push_texture(&self, display: &mut Display, texture: Texture,
-		tc: TexCoords) -> Shape
+		tc: TexCoords, blending: bool, fancy: bool) -> Shape
 	{
-		Shape(display.renderer.textured(self.vertices, texture, tc.0))
+		Shape(display.renderer.textured(self.vertices, texture, tc.0,
+			blending, fancy))
 	}
 
 	/// Push a shape with a texture, texture coordinates and alpha
@@ -167,9 +180,10 @@ impl ShapeBuilder {
 	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`
 	#[inline(always)]
 	pub fn push_faded(&self, display: &mut Display, texture: Texture,
-		tc: TexCoords, alpha: f32) -> Shape
+		tc: TexCoords, alpha: f32, fancy: bool) -> Shape
 	{
-		Shape(display.renderer.faded(self.vertices, texture, tc.0, alpha))
+		Shape(display.renderer.faded(self.vertices, texture, tc.0,
+			alpha, fancy))
 	}
 
 	/// Push a shape with a texture and texture coordinates and tint
@@ -177,9 +191,11 @@ impl ShapeBuilder {
 	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`
 	#[inline(always)]
 	pub fn push_tinted(&self, display: &mut Display, texture: Texture,
-		tc: TexCoords, tint: [f32; 4]) -> Shape
+		tc: TexCoords, tint: [f32; 4], blending: bool, fancy: bool)
+		-> Shape
 	{
-		Shape(display.renderer.tinted(self.vertices, texture, tc.0, tint))
+		Shape(display.renderer.tinted(self.vertices, texture, tc.0,
+			tint, blending, fancy))
 	}
 
 	/// Push a shape with a texture and texture coordinates and tint per
@@ -188,10 +204,11 @@ impl ShapeBuilder {
 	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`
 	#[inline(always)]
 	pub fn push_complex(&self, display: &mut Display, texture: Texture,
-		tc: TexCoords, tints: Gradient) -> Shape
+		tc: TexCoords, tints: Gradient, blending: bool, fancy: bool)
+		-> Shape
 	{
 		Shape(display.renderer.complex(self.vertices, texture, tc.0,
-			tints.0))
+			tints.0, blending, fancy))
 	}
 }
 
@@ -267,6 +284,18 @@ impl Transform {
 	}
 }
 
+impl ::std::ops::Mul<octree::geom::Vec3> for Transform {
+	type Output = octree::geom::Vec3;
+
+	fn mul(self, rhs: octree::geom::Vec3) -> Self::Output {
+		let x = self.0[0]*rhs.x + self.0[4]*rhs.y + self.0[8]*rhs.z + self.0[12]*1.0;
+		let y = self.0[1]*rhs.x + self.0[5]*rhs.y + self.0[9]*rhs.z + self.0[13]*1.0;
+		let z = self.0[2]*rhs.x + self.0[6]*rhs.y + self.0[10]*rhs.z + self.0[14]*1.0;
+
+		octree::geom::Vec3::new(x, y, z)
+	}
+}
+
 impl ::std::ops::Mul<Transform> for Transform {
 	type Output = Transform;
 
@@ -308,5 +337,13 @@ impl ::std::ops::Mul<Transform> for Transform {
 			(self.0[12] * rhs.0[3]) + (self.0[13] * rhs.0[7]) +
 			(self.0[14] * rhs.0[11]) + (self.0[15] * rhs.0[15])
 		])
+	}
+}
+
+impl std::fmt::Display for Transform {
+	fn fmt(&self, fmtr: &mut std::fmt::Formatter) ->
+		std::result::Result<(), std::fmt::Error>
+	{
+		write!(fmtr, "{:?}", self.0)
 	}
 }

@@ -18,6 +18,9 @@ mod ffi;
 use self::ffi::vulkan::ffi::types::*;
 use self::ffi::vulkan::ffi::Connection;
 
+// TODO Moved
+use self::ffi::vulkan::ffi as asi_vulkan;
+
 #[repr(C)] struct TransformAndFadeUniform {
 	mat4: [f32; 16],
 	fade: f32,
@@ -30,6 +33,11 @@ use self::ffi::vulkan::ffi::Connection;
 
 #[repr(C)] struct TransformUniform {
 	mat4: [f32; 16],
+}
+
+pub enum ShapeHandle {
+	Alpha(u32),
+	Opaque(u32),
 }
 
 #[repr(C)]
@@ -62,29 +70,6 @@ pub struct Vw {
 	sampled: bool,
 }
 
-#[derive(Copy, Clone)]
-pub struct Shader {
-	vertex: VkShaderModule,
-	fragment: VkShaderModule,
-	textures: u32,
-	vertex_buffers: u32,
-}
-
-impl Shader {
-	pub fn new(connection: &Connection, device: VkDevice,
-		vert: &'static [u8], frag: &'static [u8], textures: u32,
-		vertex_buffers: u32) -> Shader
-	{
-		let (vertex, fragment) = unsafe {
-			vulkan::ffi::new_shader(connection, device, vert, frag)
-		};
-
-		Shader {
-			vertex, fragment, textures, vertex_buffers,
-		}
-	}
-}
-
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct Style {
@@ -115,7 +100,7 @@ pub struct Shape {
 	instance: VwInstance,
 	offset: u64,
 	bounds: [(f32, f32); 3], // xMinMax, yMinMax, zMinMax
-	center: [f32; 4], // x, y, z, w
+	center: ::octree::geom::Vec3,
 }
 
 pub struct Model {
@@ -125,7 +110,7 @@ pub struct Model {
 	indice_count: u32,
 	offset: u64,
 	bounds: [(f32, f32); 3], // xMinMax, yMinMax, zMinMax
-	center: [f32; 4], // x, y, z, w
+	center: ::octree::geom::Vec3,
 }
 
 pub struct TexCoords {
@@ -521,19 +506,58 @@ fn projection(ratio: f32, fov: f32) -> ::Transform {
 	])
 }
 
+fn draw_shape(connection: &Connection, cmdbuf: VkCommandBuffer, shape: &Shape) {
+	unsafe {
+		vulkan::ffi::cmd_bind_vb(connection,
+			cmdbuf,
+			&shape.buffers[..shape.num_buffers],
+			shape.offset);
+
+		vulkan::ffi::cmd_bind_pipeline(&connection,
+			cmdbuf,
+			shape.instance.pipeline.pipeline);
+
+		vulkan::ffi::cmd_bind_descsets(&connection,
+			cmdbuf,
+			shape.instance.pipeline.pipeline_layout,
+			shape.instance.desc_set);
+	}
+
+	vulkan::cmd_draw(&connection,
+		cmdbuf,
+		shape.vertice_count, 0);
+//		shape.offset as i32);
+}
+
 pub struct Renderer {
 	vw: Vw,
 	connection: Connection,
-	shapes: Vec<Shape>,
+	opaque_octree: ::octree::Octree,
+	alpha_octree: ::octree::Octree,
+	opaque_points: ::octree::Points,
+	alpha_points: ::octree::Points,
+	opaque_shapes: Vec<Shape>,
+	alpha_shapes: Vec<Shape>,
 	models: Vec<Model>,
 	texcoords: Vec<TexCoords>,
 	gradients: Vec<Gradient>,
 	style_solid: Style,
+	style_nasolid: Style,
+	style_bsolid: Style,
 	style_texture: Style,
+	style_natexture: Style,
+	style_btexture: Style,
 	style_gradient: Style,
+	style_nagradient: Style,
+	style_bgradient: Style,
 	style_faded: Style,
+	style_bfaded: Style,
 	style_tinted: Style,
+	style_natinted: Style,
+	style_btinted: Style,
 	style_complex: Style,
+	style_nacomplex: Style,
+	style_bcomplex: Style,
 	projection: ::Transform,
 	camera_buffer: vulkan::ffi::GpuBuffer,
 	camera_memory: vulkan::ffi::GpuMemory,
@@ -544,37 +568,128 @@ impl Renderer {
 		-> Renderer
 	{
 		let (connection, vw) = Vw::new(window_name, window_connection);
-		let shadev = vec![
-			Shader::new(&connection, vw.device,
-				include_bytes!("../native_renderer/vulkan/res/solid-vert.spv"),
-				include_bytes!("../native_renderer/vulkan/res/solid-frag.spv"), 0, 1),
-			Shader::new(&connection, vw.device,
-				include_bytes!("../native_renderer/vulkan/res/texture-vert.spv"),
-				include_bytes!("../native_renderer/vulkan/res/texture-frag.spv"), 1, 2),
-			Shader::new(&connection, vw.device,
-				include_bytes!("../native_renderer/vulkan/res/gradient-vert.spv"),
-				include_bytes!("../native_renderer/vulkan/res/gradient-frag.spv"), 0, 2),
-			Shader::new(&connection, vw.device,
-				include_bytes!("../native_renderer/vulkan/res/faded-vert.spv"),
-				include_bytes!("../native_renderer/vulkan/res/faded-frag.spv"), 1, 2),
-			Shader::new(&connection, vw.device,
-				include_bytes!("../native_renderer/vulkan/res/tinted-vert.spv"),
-				include_bytes!("../native_renderer/vulkan/res/tinted-frag.spv"), 1, 2),
-			Shader::new(&connection, vw.device,
-				include_bytes!("../native_renderer/vulkan/res/complex-vert.spv"),
-				include_bytes!("../native_renderer/vulkan/res/complex-frag.spv"), 1, 3),
-		];
 
-		let mut styles = Vec::with_capacity(shadev.len());
-		for i in &shadev {
-			styles.push(
-				unsafe {
-					vulkan::ffi::new_pipeline(&connection,
-						vw.device, vw.render_pass,
-						vw.width, vw.height, *i)
-				}
-			);
-		}
+		let solid_vert = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/solid-vert.spv"));
+		let solid_frag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/solid-frag.spv"));
+		let solid_nafrag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/solid-nafrag.spv"));
+		let solid_bfrag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/solid-bfrag.spv"));
+		let texture_vert = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/texture-vert.spv"));
+		let texture_frag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/texture-frag.spv"));
+		let texture_nafrag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/texture-nafrag.spv"));
+		let texture_bfrag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/texture-bfrag.spv"));
+		let gradient_vert = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/gradient-vert.spv"));
+		let gradient_frag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/gradient-frag.spv"));
+		let gradient_nafrag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/gradient-nafrag.spv"));
+		let gradient_bfrag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/gradient-bfrag.spv"));
+		let faded_vert = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/faded-vert.spv"));
+		let faded_frag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/faded-frag.spv"));
+		let faded_bfrag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/faded-bfrag.spv"));
+		let tinted_vert = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/gradient-vert.spv"));
+		let tinted_frag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/gradient-frag.spv"));
+		let tinted_nafrag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/gradient-nafrag.spv"));
+		let tinted_bfrag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/gradient-bfrag.spv"));
+		let complex_vert = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/gradient-vert.spv"));
+		let complex_frag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/gradient-frag.spv"));
+		let complex_nafrag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/gradient-nafrag.spv"));
+		let complex_bfrag = asi_vulkan::ShaderModule::new(&connection,
+			vw.device, include_bytes!(
+			"../native_renderer/vulkan/res/gradient-bfrag.spv"));
+
+		let style_solid = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&solid_vert, &solid_frag, 0, 1, true);
+		let style_nasolid = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&solid_vert, &solid_nafrag, 0, 1, false);
+		let style_bsolid = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&solid_vert, &solid_bfrag, 0, 1, true);
+		let style_texture = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&texture_vert, &texture_frag, 1, 2, true);
+		let style_natexture = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&texture_vert, &texture_nafrag, 1, 2, false);
+		let style_btexture = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&texture_vert, &texture_bfrag, 1, 2, true);
+		let style_gradient = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&gradient_vert, &gradient_frag, 0, 2, true);
+		let style_nagradient = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&gradient_vert, &gradient_nafrag, 0, 2, false);
+		let style_bgradient = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&gradient_vert, &gradient_bfrag, 0, 2, true);
+		let style_faded = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&faded_vert, &faded_frag, 1, 2, true);
+		let style_bfaded = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&faded_vert, &faded_bfrag, 1, 2, true);
+		let style_tinted = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&tinted_vert, &tinted_frag, 1, 2, true);
+		let style_natinted = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&tinted_vert, &tinted_nafrag, 1, 2, false);
+		let style_btinted = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&tinted_vert, &tinted_bfrag, 1, 2, true);
+		let style_complex = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&complex_vert, &complex_frag, 1, 3, true);
+		let style_nacomplex = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&complex_vert, &complex_nafrag, 1, 3, false);
+		let style_bcomplex = vulkan::ffi::new_pipeline(&connection,
+			vw.device, vw.render_pass, vw.width, vw.height,
+			&complex_vert, &complex_nafrag, 1, 3, true);
 
 		let projection = projection(vw.height as f32 / vw.width as f32,
 			90.0);
@@ -586,17 +701,25 @@ impl Renderer {
 		Renderer {
 			vw, connection, projection, camera_buffer,
 			camera_memory,
-			shapes: Vec::new(),
+			alpha_octree: ::octree::Octree::new(),
+			opaque_octree: ::octree::Octree::new(),
+			alpha_points: ::octree::Points::new(),
+			opaque_points: ::octree::Points::new(),
+			alpha_shapes: Vec::new(),
+			opaque_shapes: Vec::new(),
 			gradients: Vec::new(),
 			models: Vec::new(),
 			texcoords: Vec::new(),
-			style_solid: styles[0], style_texture: styles[1],
-			style_gradient: styles[2], style_faded: styles[3],
-			style_tinted: styles[4], style_complex: styles[5],
+			style_solid, style_nasolid, style_bsolid,
+			style_texture, style_natexture, style_btexture,
+			style_gradient, style_nagradient, style_bgradient,
+			style_faded, style_bfaded,
+			style_tinted, style_natinted, style_btinted,
+			style_complex, style_nacomplex, style_bcomplex,
 		}
 	}
 
-	pub fn update(&mut self) {
+	pub fn update(&mut self, imatrix: [f32; 16]) {
 //		let color = self.color;
 //		let presenting_finish_sem;
 //		let rendering_finish_sem;
@@ -622,27 +745,17 @@ impl Renderer {
 			vw_vulkan_draw_begin(&mut self.vw, 0.0, 0.0, 1.0);
 		}
 
-		for shape in &self.shapes {
-			unsafe {
-				vulkan::ffi::cmd_bind_vb(&self.connection,
-					self.vw.command_buffer,
-					&shape.buffers[..shape.num_buffers],
-					shape.offset);
+//		for shape in &self.shapes {
+		for id in self.opaque_octree.nearest(&self.opaque_points, imatrix) {
+			let shape = &self.opaque_shapes[*id as usize - 1];
 
-				vulkan::ffi::cmd_bind_pipeline(&self.connection,
-					self.vw.command_buffer,
-					shape.instance.pipeline.pipeline);
+			draw_shape(&self.connection, self.vw.command_buffer, shape);
+		}
 
-				vulkan::ffi::cmd_bind_descsets(&self.connection,
-					self.vw.command_buffer,
-					shape.instance.pipeline.pipeline_layout,
-					shape.instance.desc_set);
-			}
+		for id in self.alpha_octree.farthest(&self.alpha_points, imatrix) {
+			let shape = &self.alpha_shapes[*id as usize - 1];
 
-			vulkan::cmd_draw(&self.connection,
-				self.vw.command_buffer,
-				shape.vertice_count, 0);
-//				shape.offset as i32);
+			draw_shape(&self.connection, self.vw.command_buffer, shape);
 		}
 
 		unsafe {
@@ -657,7 +770,10 @@ impl Renderer {
 		swapchain_delete(&self.connection, &mut self.vw);
 		swapchain_resize(&self.connection, &mut self.vw);
 
-		self.shapes.clear();
+		self.opaque_shapes.clear();
+		self.alpha_shapes.clear();
+		self.opaque_octree = ::octree::Octree::new();
+		self.alpha_octree = ::octree::Octree::new();
 //		self.models.clear();
 //		self.texcoords.clear();
 //		self.gradients.clear();
@@ -741,7 +857,7 @@ impl Renderer {
 			indice_count: indices.len() as u32,
 			offset,
 			bounds: [(xmin, xmax), (ymin, ymax), (zmin, zmax)],
-			center: [xtot / n, ytot / n, ztot / n, 1.0],
+			center: ::octree::geom::Vec3::new(xtot / n, ytot / n, ztot / n),
 		});
 
 		a
@@ -793,15 +909,13 @@ impl Renderer {
 	}
 
 	pub fn textured(&mut self, model: usize, texture: Texture,
-		texcoords: usize) -> usize
+		texcoords: usize, alpha: bool, blend: bool) -> ShapeHandle
 	{
 		if self.models[model].vertex_count
 			!= self.texcoords[texcoords].vertex_count
 		{
 			panic!("TexCoord length doesn't match vertex length");
 		}
-
-		let a = self.shapes.len();
 
 		let uniform = TransformUniform {
 			mat4: [	1.0, 0.0, 0.0, 0.0,
@@ -816,9 +930,17 @@ impl Renderer {
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
-				self.style_texture,
+				if blend {
+					self.style_btexture
+				} else {
+					if alpha {
+						self.style_texture
+					} else {
+						self.style_natexture
+					}
+				},
 				mem::size_of::<TransformUniform>(),
-				&self.camera_buffer,
+				&self.camera_buffer, // TODO: at shader creation, not shape creation
 				mem::size_of::<TransformUniform>(),
 				texture.view,
 				texture.sampler,
@@ -830,7 +952,7 @@ impl Renderer {
 			instance.uniform_memory, &uniform,
 			mem::size_of::<TransformUniform>());
 
-		self.shapes.push(Shape {
+		let shape = Shape {
 			instance,
 			num_buffers: 2,
 			buffers: [
@@ -842,14 +964,29 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
-		});
+		};
 
-		a
+		if alpha {
+			self.alpha_shapes.push(shape);
+			self.alpha_points.add(self.models[model].center);
+			let a = self.alpha_octree.len();
+			self.alpha_octree.add(self.alpha_shapes.len() as u32,
+				&self.alpha_points);
+			ShapeHandle::Alpha(a)
+		} else {
+			self.opaque_shapes.push(shape);
+			self.opaque_points.add(self.models[model].center);
+			let a = self.opaque_octree.len() as u32;
+			self.opaque_octree.add(self.opaque_shapes.len() as u32,
+				&self.opaque_points);
+			ShapeHandle::Opaque(a)
+		}
 	}
 
-	pub fn solid(&mut self, model: usize, color: [f32; 4]) -> usize {
-		let a = self.shapes.len();
-
+	pub fn solid(&mut self, model: usize, color: [f32; 4], alpha: bool,
+		blend: bool)
+		-> ShapeHandle
+	{
 		let matrix = TransformAndColorUniform {
 			vec4: color,
 			mat4: [	1.0, 0.0, 0.0, 0.0,
@@ -864,7 +1001,15 @@ impl Renderer {
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
-				self.style_solid,
+				if blend {
+					self.style_bsolid
+				} else {
+					if alpha {
+						self.style_solid
+					} else {
+						self.style_nasolid
+					}
+				},
 				mem::size_of::<TransformAndColorUniform>(),
 				&self.camera_buffer,
 				mem::size_of::<TransformUniform>(),
@@ -878,7 +1023,7 @@ impl Renderer {
 			instance.uniform_memory, &matrix,
 			mem::size_of::<TransformAndColorUniform>());
 
-		self.shapes.push(Shape {
+		let shape = Shape {
 			instance,
 			num_buffers: 1,
 			buffers: [
@@ -890,19 +1035,34 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
-		});
+		};
 
-		a
+		if alpha {
+			self.alpha_shapes.push(shape);
+			self.alpha_points.add(self.models[model].center);
+			let a = self.alpha_octree.len();
+			self.alpha_octree.add(self.alpha_shapes.len() as u32,
+				&self.alpha_points);
+			ShapeHandle::Alpha(a)
+		} else {
+			self.opaque_shapes.push(shape);
+			self.opaque_points.add(self.models[model].center);
+			let a = self.opaque_octree.len() as u32;
+			self.opaque_octree.add(self.opaque_shapes.len() as u32,
+				&self.opaque_points);
+			ShapeHandle::Opaque(a)
+		}
 	}
 
-	pub fn gradient(&mut self, model: usize, colors: usize) -> usize {
+	pub fn gradient(&mut self, model: usize, colors: usize, alpha: bool,
+		blend: bool)
+		-> ShapeHandle
+	{
 		if self.models[model].vertex_count
 			!= self.gradients[colors].vertex_count
 		{
 			panic!("TexCoord length doesn't match gradient length");
 		}
-
-		let a = self.shapes.len();
 
 		let uniform = TransformUniform {
 			mat4: [	1.0, 0.0, 0.0, 0.0,
@@ -917,7 +1077,15 @@ impl Renderer {
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
-				self.style_gradient,
+				if blend {
+					self.style_bgradient
+				} else {
+					if alpha {
+						self.style_gradient
+					} else {
+						self.style_nagradient
+					}
+				},
 				mem::size_of::<TransformUniform>(),
 				&self.camera_buffer,
 				mem::size_of::<TransformUniform>(),
@@ -933,7 +1101,7 @@ impl Renderer {
 
 		println!("PUSH GRADIENT");
 
-		self.shapes.push(Shape {
+		let shape = Shape {
 			instance,
 			num_buffers: 2,
 			buffers: [
@@ -945,13 +1113,27 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
-		});
+		};
 
-		a
+		if alpha {
+			self.alpha_shapes.push(shape);
+			self.alpha_points.add(self.models[model].center);
+			let a = self.alpha_octree.len();
+			self.alpha_octree.add(self.alpha_shapes.len() as u32,
+				&self.alpha_points);
+			ShapeHandle::Alpha(a)
+		} else {
+			self.opaque_shapes.push(shape);
+			self.opaque_points.add(self.models[model].center);
+			let a = self.opaque_octree.len() as u32;
+			self.opaque_octree.add(self.opaque_shapes.len() as u32,
+				&self.opaque_points);
+			ShapeHandle::Opaque(a)
+		}
 	}
 
 	pub fn faded(&mut self, model: usize, texture: Texture,
-		texcoords: usize, fade_factor: f32) -> usize
+		texcoords: usize, fade_factor: f32, blend: bool) -> ShapeHandle
 	{
 		if self.models[model].vertex_count
 			!= self.texcoords[texcoords].vertex_count
@@ -959,7 +1141,7 @@ impl Renderer {
 			panic!("TexCoord length doesn't match vertex length");
 		}
 
-		let a = self.shapes.len();
+		let a = self.opaque_octree.len();
 
 		let uniform = TransformAndFadeUniform {
 			mat4: [	1.0, 0.0, 0.0, 0.0,
@@ -975,7 +1157,11 @@ impl Renderer {
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
-				self.style_faded,
+				if blend {
+					self.style_bfaded
+				} else {
+					self.style_faded
+				},
 				mem::size_of::<TransformAndFadeUniform>(),
 				&self.camera_buffer,
 				mem::size_of::<TransformUniform>(),
@@ -989,7 +1175,7 @@ impl Renderer {
 			instance.uniform_memory, &uniform,
 			mem::size_of::<TransformAndFadeUniform>());
 
-		self.shapes.push(Shape {
+		let shape = Shape {
 			instance,
 			num_buffers: 2,
 			buffers: [
@@ -1001,21 +1187,27 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
-		});
+		};
 
-		a
+		self.opaque_shapes.push(shape);
+
+		self.opaque_points.add(self.models[model].center);
+
+		self.opaque_octree.add(self.opaque_shapes.len() as u32,
+			&self.opaque_points);
+
+		ShapeHandle::Opaque(a)
 	}
 
 	pub fn tinted(&mut self, model: usize, texture: Texture,
-		texcoords: usize, color: [f32; 4]) -> usize
+		texcoords: usize, color: [f32; 4], alpha: bool, blend: bool)
+		-> ShapeHandle
 	{
 		if self.models[model].vertex_count
 			!= self.texcoords[texcoords].vertex_count
 		{
 			panic!("TexCoord length doesn't match vertex length");
 		}
-
-		let a = self.shapes.len();
 
 		let uniform = TransformAndColorUniform {
 			mat4: [	1.0, 0.0, 0.0, 0.0,
@@ -1031,7 +1223,15 @@ impl Renderer {
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
-				self.style_tinted,
+				if blend {
+					self.style_btinted
+				} else {
+					if alpha {
+						self.style_tinted
+					} else {
+						self.style_natinted
+					}
+				},
 				mem::size_of::<TransformAndColorUniform>(),
 				&self.camera_buffer,
 				mem::size_of::<TransformUniform>(),
@@ -1045,7 +1245,7 @@ impl Renderer {
 			instance.uniform_memory, &uniform,
 			mem::size_of::<TransformAndColorUniform>());
 
-		self.shapes.push(Shape {
+		let shape = Shape {
 			instance,
 			num_buffers: 2,
 			buffers: [
@@ -1057,13 +1257,28 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
-		});
+		};
 
-		a
+		if alpha {
+			self.alpha_shapes.push(shape);
+			self.alpha_points.add(self.models[model].center);
+			let a = self.alpha_octree.len();
+			self.alpha_octree.add(self.alpha_shapes.len() as u32,
+				&self.alpha_points);
+			ShapeHandle::Alpha(a)
+		} else {
+			self.opaque_shapes.push(shape);
+			self.opaque_points.add(self.models[model].center);
+			let a = self.opaque_octree.len() as u32;
+			self.opaque_octree.add(self.opaque_shapes.len() as u32,
+				&self.opaque_points);
+			ShapeHandle::Opaque(a)
+		}
 	}
 
 	pub fn complex(&mut self, model: usize, texture: Texture,
-		texcoords: usize, colors: usize) -> usize
+		texcoords: usize, colors: usize, alpha: bool, blend: bool)
+		-> ShapeHandle
 	{
 		if self.models[model].vertex_count
 			!= self.texcoords[texcoords].vertex_count ||
@@ -1072,8 +1287,6 @@ impl Renderer {
 		{
 			panic!("TexCoord length doesn't match vertex length");
 		}
-
-		let a = self.shapes.len();
 
 		let uniform = TransformUniform {
 			mat4: [	1.0, 0.0, 0.0, 0.0,
@@ -1088,7 +1301,15 @@ impl Renderer {
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
-				self.style_complex,
+				if blend {
+					self.style_bcomplex
+				} else {
+					if alpha {
+						self.style_complex
+					} else {
+						self.style_nacomplex
+					}
+				},
 				mem::size_of::<TransformUniform>(),
 				&self.camera_buffer,
 				mem::size_of::<TransformUniform>(),
@@ -1102,7 +1323,7 @@ impl Renderer {
 			instance.uniform_memory, &uniform,
 			mem::size_of::<TransformUniform>());
 
-		self.shapes.push(Shape {
+		let shape = Shape {
 			instance,
 			num_buffers: 3,
 			buffers: [
@@ -1114,26 +1335,73 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
-		});
+		};
 
-		a
+		if alpha {
+			self.alpha_shapes.push(shape);
+			self.alpha_points.add(self.models[model].center);
+			let a = self.alpha_octree.len();
+			self.alpha_octree.add(self.alpha_shapes.len() as u32,
+				&self.alpha_points);
+			ShapeHandle::Alpha(a)
+		} else {
+			self.opaque_shapes.push(shape);
+			self.opaque_points.add(self.models[model].center);
+			let a = self.opaque_octree.len() as u32;
+			self.opaque_octree.add(self.opaque_shapes.len() as u32,
+				&self.opaque_points);
+			ShapeHandle::Opaque(a)
+		}
 	}
 
-	pub fn get_projection(&self) -> ::Transform {
-		::Transform(self.projection.0)
-	}
+//	pub fn get_projection(&self) -> ::Transform {
+//		::Transform(self.projection.0)
+//	}
 
-	pub fn transform(&self, shape: usize, transform: &::Transform) -> usize {
+	pub fn transform(&mut self, shape: &ShapeHandle,
+		transform: &::Transform)
+	{
 		let uniform = TransformUniform {
 			mat4: transform.0,
 		};
 
-		vulkan::copy_memory(&self.connection, self.vw.device,
-			self.shapes[shape].instance.uniform_memory, &uniform,
-			mem::size_of::<TransformUniform>());
+//		println!("{}", transform);
+//		println!("{:?}", self.points.pos(shape + 1));
 
-		shape
+		let x = match *shape {
+			ShapeHandle::Opaque(x) => {
+				self.opaque_octree.remove(x + 1, &self.opaque_points);
+				self.opaque_points.wrt(x + 1, ::Transform(transform.0)
+					* self.opaque_shapes[x as usize].center);
+				self.opaque_octree.add(x + 1, &self.opaque_points);
+
+				vulkan::copy_memory(&self.connection, self.vw.device,
+					self.opaque_shapes[x as usize].instance.uniform_memory,
+					&uniform, mem::size_of::<TransformUniform>());
+				x
+			},
+			ShapeHandle::Alpha(x) => {
+				self.alpha_octree.remove(x + 1, &self.alpha_points);
+				self.alpha_points.wrt(x + 1, ::Transform(transform.0)
+					* self.alpha_shapes[x as usize].center);
+				self.alpha_octree.add(x + 1, &self.alpha_points);
+
+				vulkan::copy_memory(&self.connection, self.vw.device,
+					self.alpha_shapes[x as usize].instance.uniform_memory,
+					&uniform, mem::size_of::<TransformUniform>());
+				x
+			},
+		};
+
+//		use ::octree::geom::Pos;
+
+//		println!("{:?}", self.points.pos(shape + 1));
 	}
+
+/*	pub fn init_camera(&mut self) {
+		self.points.add(::octree::geom::Vec3::new(0.0, 0.0, 0.0));
+		self.octree.add(0, &self.points);
+	}*/
 
 	pub fn camera(&self, transform: &::Transform) {
 		let uniform = TransformUniform {
