@@ -12,7 +12,7 @@ layout (location = 0) out vec4 outColor;
 
 void main() {
 	outColor = inColor;
-	if(outColor.a < 1.0) {
+	if(outColor.a <= 0.0) {
 		discard;
 	}
 }

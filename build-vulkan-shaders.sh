@@ -53,10 +53,10 @@ $SPIRV_OPT $OUT_UNOPTIMIZED/texture-bfrag.spv -o $OUT_OPTIMIZED/texture-bfrag.sp
 
 glslangValidator $SRC/faded-frag.glsl -V -o $OUT_UNOPTIMIZED/faded-frag.spv -S frag
 glslangValidator $SRC/faded-vert.glsl -V -o $OUT_UNOPTIMIZED/faded-vert.spv -S vert
-glslangValidator $SRC/faded-frag.glsl -V -o $OUT_UNOPTIMIZED/faded-bfrag.spv -S frag
+glslangValidator $SRC/faded-bfrag.glsl -V -o $OUT_UNOPTIMIZED/faded-bfrag.spv -S frag
 $SPIRV_OPT $OUT_UNOPTIMIZED/faded-frag.spv -o $OUT_OPTIMIZED/faded-frag.spv
 $SPIRV_OPT $OUT_UNOPTIMIZED/faded-vert.spv -o $OUT_OPTIMIZED/faded-vert.spv
-$SPIRV_OPT $OUT_UNOPTIMIZED/faded-frag.spv -o $OUT_OPTIMIZED/faded-bfrag.spv
+$SPIRV_OPT $OUT_UNOPTIMIZED/faded-bfrag.spv -o $OUT_OPTIMIZED/faded-bfrag.spv
 
 glslangValidator $SRC/tinted-frag.glsl -V -o $OUT_UNOPTIMIZED/tinted-frag.spv -S frag
 glslangValidator $SRC/tinted-vert.glsl -V -o $OUT_UNOPTIMIZED/tinted-vert.spv -S vert

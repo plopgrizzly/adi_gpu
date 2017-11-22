@@ -16,7 +16,7 @@ layout (location = 0) out vec4 uFragColor;
 void main() {
 	vec4 sampled = texture(tex, texcoord.xy);
 	uFragColor = vec4(sampled.rgb, sampled.a * texcoord.a);
-	if(uFragColor.a < 1.0) {
+	if(uFragColor.a <= 0.0) {
 		discard;
 	}
 }

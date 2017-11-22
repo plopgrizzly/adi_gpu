@@ -1141,8 +1141,6 @@ impl Renderer {
 			panic!("TexCoord length doesn't match vertex length");
 		}
 
-		let a = self.opaque_octree.len();
-
 		let uniform = TransformAndFadeUniform {
 			mat4: [	1.0, 0.0, 0.0, 0.0,
 				0.0, 1.0, 0.0, 0.0,
@@ -1189,14 +1187,12 @@ impl Renderer {
 			center: self.models[model].center,
 		};
 
-		self.opaque_shapes.push(shape);
-
-		self.opaque_points.add(self.models[model].center);
-
-		self.opaque_octree.add(self.opaque_shapes.len() as u32,
-			&self.opaque_points);
-
-		ShapeHandle::Opaque(a)
+		self.alpha_shapes.push(shape);
+		self.alpha_points.add(self.models[model].center);
+		let a = self.alpha_octree.len();
+		self.alpha_octree.add(self.alpha_shapes.len() as u32,
+			&self.alpha_points);
+		ShapeHandle::Alpha(a)
 	}
 
 	pub fn tinted(&mut self, model: usize, texture: Texture,

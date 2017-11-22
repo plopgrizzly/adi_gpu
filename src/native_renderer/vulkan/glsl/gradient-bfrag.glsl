@@ -13,7 +13,7 @@ layout (location = 0) out vec4 uFragColor;
 
 void main() {
 	uFragColor = fragcolor;
-	if(uFragColor.a < 1.0) {
+	if(uFragColor.a <= 0.0) {
 		discard;
 	}
 }
