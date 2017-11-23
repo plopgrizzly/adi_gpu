@@ -773,8 +773,6 @@ impl Renderer {
 	}
 
 	pub fn resize(&mut self, size: (u32, u32)) {
-		println!("REAZI");
-
 		self.vw.width = size.0;
 		self.vw.height = size.1;
 		self.ar = size.0 as f32 / size.1 as f32;
