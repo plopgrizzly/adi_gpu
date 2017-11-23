@@ -24,7 +24,6 @@ mod ali_vulkan;
 mod octree;
 
 pub mod input {
-	pub use awi::InputQueue as Queue;
 	pub use awi::Msg;
 	pub use awi::Input;
 }
@@ -43,10 +42,12 @@ pub struct Display {
 impl Display {
 	/// Connect to the display as a window with a name and icon.  Icon is in
 	/// aci image format: `[ width, height, bgra pixels ]`.
-	pub fn new(name: &str, icon: afi::Graphic) -> Display {
+	pub fn new(name: &str, icon: afi::Graphic, bg_color: (f32, f32, f32))
+		-> Display
+	{
 		let window = awi::Window::new(name, icon);
-		let mut renderer = renderer::Renderer::new(name,
-			window.get_connection());
+		let renderer = renderer::Renderer::new(name,
+			window.get_connection(), bg_color);
 
 //		renderer.init_camera();
 		renderer.camera(&Transform::new());
@@ -55,17 +56,31 @@ impl Display {
 			rotate_xyz: (0.0, 0.0, 0.0) }
 	}
 
+	/// Change the background color of the `Display`.
+	pub fn bg_color(&mut self, color: (f32, f32, f32)) {
+		self.renderer.bg_color(color);
+	}
+
+	/// Get input, if there is any.
+	pub fn input(&mut self) -> Option<input::Input> {
+		let input = self.window.input();
+
+		if input == Some(input::Input::Resize) {
+			self.renderer.resize(self.window.get_dimensions());
+		}
+
+		input
+	}
+
 	/// Update the display / window.
-	pub fn update(&mut self, input_queue: &mut input::Queue) {
+	pub fn update(&mut self) {
 		self.renderer.update(Transform::new()
 			.translate(-self.xyz.0, -self.xyz.1, -self.xyz.2)
 			.rotate(-self.rotate_xyz.0, -self.rotate_xyz.1,
-				-self.rotate_xyz.2).0);
-		self.window.update(input_queue);
-
-		if input_queue.get_resized() {
-			self.renderer.resize(self.window.get_dimensions());
-		}
+				-self.rotate_xyz.2).0,
+			
+		);
+		self.window.update();
 	}
 
 	/// Update the camera position and angle.

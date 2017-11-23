@@ -608,7 +608,7 @@ pub unsafe fn new_sampler(connection: &Connection, device: VkDevice)
 			s_type: VkStructureType::SamplerCreateInfo,
 			next: ptr::null(),
 			flags: 0,
-			mag_filter: VkFilter::Nearest,
+			mag_filter: VkFilter::Linear,
 			min_filter: VkFilter::Nearest,
 			mipmap_mode: VkSamplerMipmapMode::Nearest,
 			address_mode_u: VkSamplerAddressMode::ClampToEdge,
@@ -1909,16 +1909,6 @@ impl Drop for ShaderModule {
 			(self.2)(self.1, self.0, ptr::null());
 		}
 	}
-}
-
-pub(in renderer) unsafe fn new_shader(connection: &Connection, device: VkDevice,
-	vertex_shader: &[u8], fragment_shader: &[u8])
-	-> (ShaderModule, ShaderModule)
-{
-	let mut vertex = ShaderModule::new(connection, device, vertex_shader);
-	let mut fragment = ShaderModule::new(connection, device, fragment_shader);
-
-	(vertex, fragment)
 }
 
 pub(in renderer) fn new_pipeline(connection: &Connection,

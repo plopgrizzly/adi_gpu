@@ -509,9 +509,8 @@ impl Octree {
 		}
 	}
 
-	/// Sort the octree nearest to farthest, while culling all outside of
-	/// view frustum.
-	pub fn nearest(&mut self, pts: &Pos, mat4: [f32; 16]) -> &Vec<u32> {
+	/// Sort by z value.  nr => true if Near Sort, nr => false if Far Sort
+	fn zsort(&mut self, pts: &Pos, mat4: [f32; 16], nr: bool) -> &Vec<u32> {
 		self.sorted.clear();
 
 		if self.root == 0 {
@@ -529,46 +528,27 @@ impl Octree {
 			let z2 = mat4[2] * p.x + mat4[6] * p.y + mat4[10] * p.z + mat4[14] * 1.0;
 
 			if z1 > z2 {
-				Ordering::Greater
+				if nr {Ordering::Greater} else {Ordering::Less}
 			} else if z1 < z2 {
-				Ordering::Less
+				if nr {Ordering::Less} else {Ordering::Greater}
 			} else {
 				Ordering::Equal
 			}
 		});
-
-//		self.print(pts);
 
 		&self.sorted
 	}
 
+	/// Sort the octree nearest to farthest, while culling all outside of
+	/// view frustum.
+	pub fn nearest(&mut self, pts: &Pos, mat4: [f32; 16]) -> &Vec<u32> {
+		self.zsort(pts, mat4, true)
+	}
+
+	/// Sort the octree farthest to nearest, while culling all outside of
+	/// view frustum.
 	pub fn farthest(&mut self, pts: &Pos, mat4: [f32; 16]) -> &Vec<u32> {
-		self.sorted.clear();
-
-		if self.root == 0 {
-			return &self.sorted;
-		}
-
-		let hnd = self.root - 1;
-
-		self.find_node_ch(pts, hnd);
-
-		self.sorted.sort_unstable_by(|a, b| {
-			let p = pts.pos(*a);
-			let z1 = mat4[2] * p.x + mat4[6] * p.y + mat4[10] * p.z + mat4[14] * 1.0;
-			let p = pts.pos(*b);
-			let z2 = mat4[2] * p.x + mat4[6] * p.y + mat4[10] * p.z + mat4[14] * 1.0;
-
-			if z1 > z2 {
-				Ordering::Less
-			} else if z1 < z2 {
-				Ordering::Greater
-			} else {
-				Ordering::Equal
-			}
-		});
-
-		&self.sorted
+		self.zsort(pts, mat4, false)
 	}
 
 	/// Print the octree

@@ -496,11 +496,11 @@ impl Vw {
 
 fn projection(ratio: f32, fov: f32) -> ::Transform {
 	let scale = (fov * 0.5 * ::std::f32::consts::PI / 180.).tan().recip();
-	let xscale = scale * ratio;
+	let yscale = scale * ratio;
 
 	::Transform([
-		xscale,	0.,	0.,	0.,
-		0.,	scale,	0.,	0.,
+		scale,	0.,	0.,	0.,
+		0.,	yscale,	0.,	0.,
 		0.,	0.,	1.,	1.,
 		0.,	0.,	0., 	1.,
 	])
@@ -531,6 +531,7 @@ fn draw_shape(connection: &Connection, cmdbuf: VkCommandBuffer, shape: &Shape) {
 
 pub struct Renderer {
 	vw: Vw,
+	ar: f32,
 	connection: Connection,
 	opaque_octree: ::octree::Octree,
 	alpha_octree: ::octree::Octree,
@@ -561,10 +562,12 @@ pub struct Renderer {
 	projection: ::Transform,
 	camera_buffer: vulkan::ffi::GpuBuffer,
 	camera_memory: vulkan::ffi::GpuMemory,
+	clear_color: (f32, f32, f32),
 }
 
 impl Renderer {
-	pub fn new(window_name: &str, window_connection: WindowConnection)
+	pub fn new(window_name: &str, window_connection: WindowConnection,
+		clear_color: (f32, f32, f32))
 		-> Renderer
 	{
 		let (connection, vw) = Vw::new(window_name, window_connection);
@@ -689,17 +692,17 @@ impl Renderer {
 			&complex_vert, &complex_nafrag, 1, 3, false);
 		let style_bcomplex = vulkan::ffi::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
-			&complex_vert, &complex_nafrag, 1, 3, true);
+			&complex_vert, &complex_bfrag, 1, 3, true);
 
-		let projection = projection(vw.height as f32 / vw.width as f32,
-			90.0);
+		let ar = vw.width as f32 / vw.height as f32;
+		let projection = projection(ar, 90.0);
 		let (camera_buffer, camera_memory) = unsafe {
 			ffi::vulkan::ffi::vw_camera_new(&connection, vw.device,
 				vw.gpu)
 		};
 
 		Renderer {
-			vw, connection, projection, camera_buffer,
+			vw, ar, connection, projection, camera_buffer,
 			camera_memory,
 			alpha_octree: ::octree::Octree::new(),
 			opaque_octree: ::octree::Octree::new(),
@@ -716,7 +719,12 @@ impl Renderer {
 			style_faded, style_bfaded,
 			style_tinted, style_natinted, style_btinted,
 			style_complex, style_nacomplex, style_bcomplex,
+			clear_color
 		}
+	}
+
+	pub fn bg_color(&mut self, rgb: (f32, f32, f32)) {
+		self.clear_color = rgb;
 	}
 
 	pub fn update(&mut self, imatrix: [f32; 16]) {
@@ -742,7 +750,8 @@ impl Renderer {
 				self.vw.device,
 			);
 
-			vw_vulkan_draw_begin(&mut self.vw, 0.0, 0.0, 1.0);
+			vw_vulkan_draw_begin(&mut self.vw, self.clear_color.0,
+				self.clear_color.1, self.clear_color.2);
 		}
 
 //		for shape in &self.shapes {
@@ -764,20 +773,16 @@ impl Renderer {
 	}
 
 	pub fn resize(&mut self, size: (u32, u32)) {
+		println!("REAZI");
+
 		self.vw.width = size.0;
 		self.vw.height = size.1;
+		self.ar = size.0 as f32 / size.1 as f32;
 
 		swapchain_delete(&self.connection, &mut self.vw);
 		swapchain_resize(&self.connection, &mut self.vw);
 
-		self.opaque_shapes.clear();
-		self.alpha_shapes.clear();
-		self.opaque_octree = ::octree::Octree::new();
-		self.alpha_octree = ::octree::Octree::new();
-//		self.models.clear();
-//		self.texcoords.clear();
-//		self.gradients.clear();
-		self.projection = projection(size.1 as f32/size.0 as f32, 90.0);
+		self.projection = projection(self.ar, 90.0);
 	}
 
 	pub fn texture(&mut self, width: u32, height: u32, rgba: &[u32])
@@ -1099,8 +1104,6 @@ impl Renderer {
 			instance.uniform_memory, &uniform,
 			mem::size_of::<TransformUniform>());
 
-		println!("PUSH GRADIENT");
-
 		let shape = Shape {
 			instance,
 			num_buffers: 2,
@@ -1350,10 +1353,6 @@ impl Renderer {
 		}
 	}
 
-//	pub fn get_projection(&self) -> ::Transform {
-//		::Transform(self.projection.0)
-//	}
-
 	pub fn transform(&mut self, shape: &ShapeHandle,
 		transform: &::Transform)
 	{
@@ -1361,10 +1360,7 @@ impl Renderer {
 			mat4: transform.0,
 		};
 
-//		println!("{}", transform);
-//		println!("{:?}", self.points.pos(shape + 1));
-
-		let x = match *shape {
+		match *shape {
 			ShapeHandle::Opaque(x) => {
 				self.opaque_octree.remove(x + 1, &self.opaque_points);
 				self.opaque_points.wrt(x + 1, ::Transform(transform.0)
@@ -1374,7 +1370,6 @@ impl Renderer {
 				vulkan::copy_memory(&self.connection, self.vw.device,
 					self.opaque_shapes[x as usize].instance.uniform_memory,
 					&uniform, mem::size_of::<TransformUniform>());
-				x
 			},
 			ShapeHandle::Alpha(x) => {
 				self.alpha_octree.remove(x + 1, &self.alpha_points);
@@ -1385,19 +1380,9 @@ impl Renderer {
 				vulkan::copy_memory(&self.connection, self.vw.device,
 					self.alpha_shapes[x as usize].instance.uniform_memory,
 					&uniform, mem::size_of::<TransformUniform>());
-				x
 			},
-		};
-
-//		use ::octree::geom::Pos;
-
-//		println!("{:?}", self.points.pos(shape + 1));
+		}
 	}
-
-/*	pub fn init_camera(&mut self) {
-		self.points.add(::octree::geom::Vec3::new(0.0, 0.0, 0.0));
-		self.octree.add(0, &self.points);
-	}*/
 
 	pub fn camera(&self, transform: &::Transform) {
 		let uniform = TransformUniform {
