@@ -4,6 +4,7 @@
 //
 // src/renderer/ffi/vulkan/ffi/mod.rs
 
+pub mod instance;
 pub mod types;
 
 use self::types::*;
@@ -921,7 +922,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	VkPresentModeKHR::Fifo
 }
 
-#[inline(always)] pub(in renderer) unsafe fn copy_image(connection: &Connection,
+#[inline(always)] pub unsafe fn copy_image(connection: &Connection,
 	cmd_buff: VkCommandBuffer, src_image: VkImage, dst_image: VkImage,
 	width: u32, height: u32)
 {
@@ -948,7 +949,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	);
 }
 
-#[inline(always)] pub(in renderer) unsafe fn create_swapchain(
+#[inline(always)] pub unsafe fn create_swapchain(
 	connection: &Connection, surface: VkSurfaceKHR, gpu: VkPhysicalDevice,
 	device: VkDevice, swapchain: &mut VkSwapchainKHR, width: u32,
 	height: u32, image_count: &mut u32, color_format: VkFormat,
@@ -974,7 +975,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 			pre_transform: VkSurfaceTransformFlagBitsKHR::Identity,
 			composite_alpha: VkCompositeAlphaFlagBitsKHR::Opaque,
 			present_mode: present_mode,
-			clipped: 1,
+			clipped: 0,
 			old_swapchain: mem::zeroed(), // vulkan->swapchain,
 			queue_family_index_count: 0,
 			p_queue_family_indices: ptr::null(),
@@ -989,7 +990,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 		swap_images).unwrap();
 }
 
-#[inline(always)] pub(in renderer) unsafe fn create_imgview(
+#[inline(always)] pub unsafe fn create_imgview(
 	connection: &Connection, device: VkDevice, image: VkImage,
 	format: VkFormat, has_color: bool) -> VkImageView
 {
@@ -1042,7 +1043,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	image_view
 }
 
-#[inline(always)] pub(in renderer) unsafe fn create_image_view(
+#[inline(always)] pub unsafe fn create_image_view(
 	connection: &Connection, device: VkDevice, color_format: &VkFormat,
 	submit_fence: &mut VkFence, image_count: u32,
 	swap_images: &mut [VkImage; 2], image_views: &mut [VkImageView; 2],
@@ -1125,7 +1126,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	}
 }
 
-#[inline(always)] pub(in renderer) unsafe fn create_image(
+#[inline(always)] pub unsafe fn create_image(
 	connection: &Connection, device: VkDevice, gpu: VkPhysicalDevice,
 	width: u32, height: u32, format: VkFormat, tiling: VkImageTiling,
 	usage: VkImageUsage, initial_layout: VkImageLayout, reqs_mask: VkFlags)
@@ -1187,7 +1188,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	(image, image_memory)
 }
 
-#[inline(always)] pub(in renderer) unsafe fn create_depth_buffer(
+#[inline(always)] pub unsafe fn create_depth_buffer(
 	connection: &Connection, device: VkDevice, gpu: VkPhysicalDevice,
 	command_buffer: VkCommandBuffer, submit_fence: VkFence,
 	present_queue: VkQueue, width: u32, height: u32)
@@ -1272,7 +1273,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	(image, image_view, image_memory)
 }
 
-#[inline(always)] pub(in renderer) unsafe fn create_render_pass(
+#[inline(always)] pub unsafe fn create_render_pass(
 	connection: &Connection, device: VkDevice, color_format: &VkFormat)
 	-> VkRenderPass
 {
@@ -1351,7 +1352,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	render_pass
 }
 
-#[inline(always)] pub(in renderer) unsafe fn create_framebuffers(
+#[inline(always)] pub unsafe fn create_framebuffers(
 	connection: &Connection, device: VkDevice, image_count: u32,
 	render_pass: VkRenderPass, present_imgviews: &[VkImageView],
 	depth_imgview: VkImageView, width: u32, height: u32,
@@ -1379,7 +1380,7 @@ pub unsafe fn get_present_mode(connection: &Connection, gpu: VkPhysicalDevice,
 	}
 }
 
-#[inline(always)] pub(in renderer) unsafe fn destroy_swapchain(
+#[inline(always)] pub unsafe fn destroy_swapchain(
 	connection: &Connection, device: VkDevice,
 	frame_buffers: &[VkFramebuffer], present_imgviews: &[VkImageView],
 	depth_imgview: VkImageView, render_pass: VkRenderPass, image_count: u32,
@@ -1498,7 +1499,7 @@ impl DescriptorSetWriter {
 	}
 }
 
-pub(in renderer) unsafe fn txuniform(connection: &Connection, device: VkDevice,
+pub unsafe fn txuniform(connection: &Connection, device: VkDevice,
 	desc_set: VkDescriptorSet, hastex: bool, tex_sampler: VkSampler,
 	tex_view: VkImageView, matrix_buffer: &GpuBuffer, num_bytes: usize,
 	camera_buffer: &GpuBuffer, cam_bytes: usize)
@@ -1515,7 +1516,7 @@ pub(in renderer) unsafe fn txuniform(connection: &Connection, device: VkDevice,
 }
 
 // TODO: Move to asi_vulkan
-pub(in renderer) struct GpuMemory { pub memory: VkDeviceMemory }
+pub struct GpuMemory { pub memory: VkDeviceMemory }
 
 // TODO: Move to asi_vulkan
 impl GpuMemory {
@@ -1567,7 +1568,7 @@ impl GpuMemory {
 }
 
 // TODO: Move to asi_vulkan
-pub(in renderer) struct GpuBuffer { buffer: VkBuffer }
+pub struct GpuBuffer { buffer: VkBuffer }
 
 // TODO: Move to asi_vulkan
 impl GpuBuffer {
@@ -1618,7 +1619,7 @@ impl GpuBuffer {
 	}
 }
 
-pub(in renderer) unsafe fn vw_camera_new(connection: &Connection,
+pub unsafe fn vw_camera_new(connection: &Connection,
 	device: VkDevice, gpu: VkPhysicalDevice) -> (GpuBuffer, GpuMemory)
 {
 	let ucamera_buffer = GpuBuffer::new(connection, device,
@@ -1631,7 +1632,7 @@ pub(in renderer) unsafe fn vw_camera_new(connection: &Connection,
 	(ucamera_buffer, ucamera_memory)
 }
 
-pub(in renderer) unsafe fn vw_instance_new(connection: &Connection,
+pub unsafe fn vw_instance_new(connection: &Connection,
 	device: VkDevice, gpu: VkPhysicalDevice, pipeline: ::renderer::Style,
 	num_bytes: usize, camera_buffer: &GpuBuffer, cam_bytes: usize,
 	tex_view: VkImageView, tex_sampler: VkSampler, tex_count: bool)
@@ -1711,7 +1712,7 @@ pub(in renderer) unsafe fn vw_instance_new(connection: &Connection,
 	}
 }
 
-pub(in renderer) unsafe fn new_shape(connection: &Connection, device: VkDevice,
+pub unsafe fn new_shape(connection: &Connection, device: VkDevice,
 	gpu: VkPhysicalDevice, vertices: &[f32], indices: &[u32])
 	-> (VkBuffer, VkDeviceMemory, u64)
 {
@@ -1792,7 +1793,7 @@ pub(in renderer) unsafe fn new_shape(connection: &Connection, device: VkDevice,
 	(vertex_input_buffer, vertex_buffer_memory, offset)
 }
 
-pub(in renderer) unsafe fn new_buffer(connection: &Connection, device: VkDevice,
+pub unsafe fn new_buffer(connection: &Connection, device: VkDevice,
 	gpu: VkPhysicalDevice, vertices: &[f32]) -> (VkBuffer, VkDeviceMemory)
 {
 	let size = (mem::size_of::<f32>() * vertices.len()) as u64;
@@ -1911,7 +1912,7 @@ impl Drop for ShaderModule {
 	}
 }
 
-pub(in renderer) fn new_pipeline(connection: &Connection,
+pub fn new_pipeline(connection: &Connection,
 	device: VkDevice, render_pass: VkRenderPass, width: u32, height: u32,
 	vertex: &ShaderModule, fragment: &ShaderModule, ntextures: u32,
 	nvbuffers: u32, alpha: bool) -> ::renderer::Style

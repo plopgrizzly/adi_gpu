@@ -6,12 +6,12 @@
 
 use ami::*;
 
-pub mod ffi;
 pub mod vulkan;
 // TODO: absorb into ffi, only once internal todo is resolved.
 pub mod create_surface;
 
-use self::ffi::types::*;
+use asi_vulkan;
+use asi_vulkan::types::*;
 
 pub struct VulkanRenderer {
 	native: vulkan::Vulkan,
@@ -45,11 +45,11 @@ fn check_error(name: &str, error: VkResult) {
 #[cfg(not(feature = "checks"))]
 fn check_error(_: &str, _: VkResult) { }
 
-pub fn copy_memory<T>(connection: &ffi::Connection, vk_device: VkDevice,
+pub fn copy_memory<T>(connection: &asi_vulkan::Connection, vk_device: VkDevice,
 	vk_memory: VkDeviceMemory, data: *const T, size: usize)
 {
 	let mapped = unsafe {
-		ffi::map_memory(connection, vk_device, vk_memory, !0)
+		asi_vulkan::map_memory(connection, vk_device, vk_memory, !0)
 	};
 
 	if mapped.is_null() {
@@ -67,16 +67,16 @@ pub fn copy_memory<T>(connection: &ffi::Connection, vk_device: VkDevice,
 
 	unsafe {
 //		ptr::copy_nonoverlapping(data.as_ptr(), mapped, data.len());
-		ffi::unmap_memory(connection, vk_device, vk_memory);
+		asi_vulkan::unmap_memory(connection, vk_device, vk_memory);
 	}
 }
 
-pub fn copy_memory_pitched<T>(connection: &ffi::Connection, vk_device: VkDevice,
-	vk_memory: VkDeviceMemory, data: &[T], width: isize, height: isize,
-	pitch: isize)
+pub fn copy_memory_pitched<T>(connection: &asi_vulkan::Connection,
+	vk_device: VkDevice, vk_memory: VkDeviceMemory, data: &[T],
+	width: isize, height: isize, pitch: isize)
 {
 	let mapped : *mut T = unsafe {
-		ffi::map_memory(connection, vk_device, vk_memory, !0)
+		asi_vulkan::map_memory(connection, vk_device, vk_memory, !0)
 	};
 
 	if mapped.is_null() {
@@ -97,15 +97,15 @@ pub fn copy_memory_pitched<T>(connection: &ffi::Connection, vk_device: VkDevice,
 	}
 
 	unsafe {
-		ffi::unmap_memory(connection, vk_device, vk_memory);
+		asi_vulkan::unmap_memory(connection, vk_device, vk_memory);
 	}
 }
 
-pub fn cmd_draw(connection: &ffi::Connection, cmd_buffer: VkCommandBuffer,
-	vertex_count: u32, vertex_offset: i32)
+pub fn cmd_draw(connection: &asi_vulkan::Connection,
+	cmd_buffer: VkCommandBuffer, vertex_count: u32, vertex_offset: i32)
 {
 	unsafe {
-		ffi::cmd_draw(connection, cmd_buffer, vertex_count, 1, 0,
+		asi_vulkan::cmd_draw(connection, cmd_buffer, vertex_count, 1, 0,
 			vertex_offset, 0);
 	}
 }

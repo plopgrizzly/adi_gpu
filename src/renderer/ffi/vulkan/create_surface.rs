@@ -11,7 +11,7 @@ use std::mem;
 use ami::*;
 use awi::WindowConnection;
 
-use super::ffi::types::*;
+use asi_vulkan::types::*;
 use super::check_error;
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]

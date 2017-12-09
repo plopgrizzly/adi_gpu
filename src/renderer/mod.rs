@@ -15,11 +15,9 @@ use self::ffi::vulkan;
 
 mod ffi;
 
-use self::ffi::vulkan::ffi::types::*;
-use self::ffi::vulkan::ffi::Connection;
-
-// TODO Moved
-use self::ffi::vulkan::ffi as asi_vulkan;
+use asi_vulkan;
+use asi_vulkan::types::*;
+use asi_vulkan::Connection;
 
 #[repr(C)] struct TransformAndFadeUniform {
 	mat4: [f32; 16],
@@ -73,9 +71,9 @@ pub struct Vw {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct Style {
-	pipeline: VkPipeline,
+	pub pipeline: VkPipeline,
 	pub descsetlayout: VkDescriptorSetLayout,
-	pipeline_layout: VkPipelineLayout,
+	pub pipeline_layout: VkPipelineLayout,
 }
 
 #[repr(C)]
@@ -93,6 +91,7 @@ pub struct Texture {
 	staged: bool,
 }
 
+#[derive(Clone)]
 pub struct Shape {
 	num_buffers: usize,
 	buffers: [VkBuffer; 3],
@@ -100,7 +99,8 @@ pub struct Shape {
 	instance: VwInstance,
 	offset: u64,
 	bounds: [(f32, f32); 3], // xMinMax, yMinMax, zMinMax
-	center: ::octree::geom::Vec3,
+	center: ::math::Vec3<f32>,
+	position: ::math::Vec3<f32>,
 }
 
 pub struct Model {
@@ -110,7 +110,7 @@ pub struct Model {
 	indice_count: u32,
 	offset: u64,
 	bounds: [(f32, f32); 3], // xMinMax, yMinMax, zMinMax
-	center: ::octree::geom::Vec3,
+	center: ::math::Vec3<f32>,
 }
 
 pub struct TexCoords {
@@ -125,34 +125,19 @@ pub struct Gradient {
 	vertex_count: u32,
 }
 
-// TODO
-/*impl Shape {
-	pub fn create(window: &mut Window, v: &[f32], style: style::Style) -> Shape {
-		let size = v.len() as u32;
-		let hastx = {
-			match style {
-				style::Style::Solid(_) => false,
-				style::Style::Texture(_, _) => true,
-				style::Style::Invisible => {
-					panic!("Can't create a Sprite with \
-						invisible style.")
-				}
-			}
-		};
-		let mut shape = VwShape {
-			vertex_buffer_memory: 0,
-			vertex_input_buffer: 0,
-			vertice_count: size / 8,
-		};
-		unsafe { vulkan::ffi::new_shape(&mut shape, window.vw, &v[0], size); }
-		Shape {
-			shape: shape,
-			hastx: hastx,
-			instances: Vec::new(),
-		}
+impl ::math::Pos for Shape {
+	fn posf(&self) -> ::math::Vec3<f32> {
+		self.position
 	}
 
-	pub fn animate(window: &mut Window, index: usize, i: usize,
+	fn posi(&self) -> ::math::Vec3<i32> {
+		self.position.into()
+	}
+}
+
+impl Shape {
+// TODO
+/*	pub fn animate(window: &mut Window, index: usize, i: usize,
 		texture: *const NativeTexture, style: Style)
 	{
 		let hastx = window.sprites[index].hastx;
@@ -172,7 +157,7 @@ pub struct Gradient {
 
 		// Free old Style, and set new uniform buffers.
 		unsafe {
-			vulkan::ffi::destroy_uniforms(&window.vw, &mut
+			asi_vulkan::destroy_uniforms(&window.vw, &mut
 				window.sprites[index].instances[i].instance);
 			window.sprites[index].instances[i].instance =
 				vw_vulkan_uniforms(&window.vw, style, texture,
@@ -188,53 +173,11 @@ pub struct Gradient {
 		Shape::enable(window, index, i, true);
 	}
 
-	pub fn add(window: &mut Window, index: usize, tx: *const NativeTexture,
-		style: Style)
-	{
-		let shape = &mut window.sprites[index];
-		let mem = VwLinkedInstance {
-			instance: unsafe {
-				vw_vulkan_uniforms(&window.vw, style, tx,
-					if shape.hastx { 1 } else { 0 })
-			},
-			enabled: true,
-		};
-		vulkan::copy_memory(window.vw.device,
-			mem.instance.uniform_memory, &mem.matrix);
-		shape.instances.push(mem);
-	}
-
-	pub fn draw(window: &mut Window, index: usize) {
-		let shape = &window.sprites[index];
-		for i in 0..shape.instances.len() {
-			if !window.sprites[index].instances[i].enabled {
-				continue;
-			}
-			unsafe {
-				vw_vulkan_draw_shape(&mut window.vw,
-					&shape.shape,
-					&shape.instances[i].matrix[0],
-					shape.instances[i].instance);
-			}
-			vulkan::cmd_draw(window.vw.command_buffer,
-				shape.shape.vertice_count);
-		}
-	}
-
-	pub fn matrix(window: &mut Window, index: usize, i: usize,
-		matrix: [f32; 16])
-	{
-		window.sprites[index].instances[i].matrix = matrix;
-		vulkan::copy_memory(window.vw.device,
-			window.sprites[index].instances[i].instance.uniform_memory,
-			&window.sprites[index].instances[i].matrix);
-	}
-
 	pub fn vertices(window: &Window, index: usize, v: &[f32]) {
 		vulkan::copy_memory(window.vw.device,
 			window.sprites[index].shape.vertex_buffer_memory, v);
-	}
-}*/
+	}*/
+}
 
 #[derive(Copy, Clone)]
 pub struct VwInstance {
@@ -254,7 +197,7 @@ extern {
 fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 	unsafe {
 		// Link swapchain to vulkan instance.
-		vulkan::ffi::create_swapchain(
+		asi_vulkan::create_swapchain(
 			connection,
 			vw.surface,
 			vw.gpu,
@@ -268,7 +211,7 @@ fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 			&mut vw.present_images[0]);
 
 		// Link Image Views for each framebuffer
-		vulkan::ffi::create_image_view(
+		asi_vulkan::create_image_view(
 			connection,
 			vw.device,
 			&vw.color_format,
@@ -281,7 +224,7 @@ fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 		);
 
 		// Link Depth Buffer to swapchain
-		let (img, view, mem) = vulkan::ffi::create_depth_buffer(
+		let (img, view, mem) = asi_vulkan::create_depth_buffer(
 			connection,
 			vw.device,
 			vw.gpu,
@@ -297,14 +240,14 @@ fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 		vw.depth_image_memory = mem;
 
 		// Link Render Pass to swapchain
-		vw.render_pass = vulkan::ffi::create_render_pass(
+		vw.render_pass = asi_vulkan::create_render_pass(
 			connection,
 			vw.device,
 			&vw.color_format,
 		);
 
 		// Link Framebuffers to swapchain
-		vulkan::ffi::create_framebuffers(
+		asi_vulkan::create_framebuffers(
 			connection,
 			vw.device,
 			vw.image_count,
@@ -320,7 +263,7 @@ fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 
 fn swapchain_delete(connection: &Connection, vw: &mut Vw) {
 	unsafe {
-		vulkan::ffi::destroy_swapchain(
+		asi_vulkan::destroy_swapchain(
 			connection,
 			vw.device,
 			&vw.frame_buffers,
@@ -342,7 +285,7 @@ fn new_texture(connection: &Connection, vw: &mut Vw, width: u32, height: u32)
 	let staged = !vw.sampled;
 
 	let (mappable_image, mappable_memory) = unsafe {
-		vulkan::ffi::create_image(
+		asi_vulkan::create_image(
 			connection, vw.device, vw.gpu, width, height,
 			VkFormat::R8g8b8a8Srgb, VkImageTiling::Linear,
 			if staged { VkImageUsage::TransferSrcBit }
@@ -353,7 +296,7 @@ fn new_texture(connection: &Connection, vw: &mut Vw, width: u32, height: u32)
 	};
 
 	let layout = unsafe {
-		vulkan::ffi::subres_layout(connection, vw.device,
+		asi_vulkan::subres_layout(connection, vw.device,
 			mappable_image)
 	};
 
@@ -361,7 +304,7 @@ fn new_texture(connection: &Connection, vw: &mut Vw, width: u32, height: u32)
 
 	let (image, memory) = if staged {
 		unsafe {
-			vulkan::ffi::create_image(
+			asi_vulkan::create_image(
 				connection, vw.device, vw.gpu, width, height,
 				VkFormat::R8g8b8a8Srgb, VkImageTiling::Optimal,
 				VkImageUsage::TransferDstAndUsage,
@@ -371,10 +314,10 @@ fn new_texture(connection: &Connection, vw: &mut Vw, width: u32, height: u32)
 		(mappable_image, mappable_memory)
 	};
 //
-	let sampler = unsafe { vulkan::ffi::new_sampler(connection, vw.device) };
+	let sampler = unsafe { asi_vulkan::new_sampler(connection, vw.device) };
 
 	let view = unsafe {
-		vulkan::ffi::create_imgview(connection, vw.device, image,
+		asi_vulkan::create_imgview(connection, vw.device, image,
 			VkFormat::R8g8b8a8Srgb, true)
 	};
 //
@@ -401,7 +344,7 @@ fn set_texture(connection: &Connection, vw: &mut Vw, texture: &mut Texture,
 
 		// Copy data from linear image to optimal image.
 		unsafe {
-			vulkan::ffi::copy_image(connection,
+			asi_vulkan::copy_image(connection,
 				vw.command_buffer, texture.mappable_image,
 				texture.image, texture.w, texture.h
 			);
@@ -440,27 +383,27 @@ impl Vw {
 			instance, window_connection);
 
 		let (gpu, pqi, sampled) = unsafe {
-			vulkan::ffi::get_gpu(&connection.0, instance, surface)
+			asi_vulkan::get_gpu(&connection.0, instance, surface)
 		};
 		let device = unsafe {
-			vulkan::ffi::create_device(&connection.0, gpu, pqi)
+			asi_vulkan::create_device(&connection.0, gpu, pqi)
 		};
 		let present_queue = unsafe {
-			vulkan::ffi::create_queue(&connection.0, device, pqi)
+			asi_vulkan::create_queue(&connection.0, device, pqi)
 		};
 		let command_buffer = unsafe {
-			vulkan::ffi::create_command_buffer(&connection.0,
+			asi_vulkan::create_command_buffer(&connection.0,
 				device, pqi)
 		}.0;
 		let color_format = unsafe {
-			vulkan::ffi::get_color_format(&connection.0,
+			asi_vulkan::get_color_format(&connection.0,
 				gpu, surface)
 		};
 		let image_count = unsafe {
-			vulkan::ffi::get_buffering(&connection.0, gpu, surface)
+			asi_vulkan::get_buffering(&connection.0, gpu, surface)
 		};
 		let present_mode = unsafe {
-			vulkan::ffi::get_present_mode(&connection.0, gpu,
+			asi_vulkan::get_present_mode(&connection.0, gpu,
 				surface)
 		};
 
@@ -508,16 +451,16 @@ fn projection(ratio: f32, fov: f32) -> ::Transform {
 
 fn draw_shape(connection: &Connection, cmdbuf: VkCommandBuffer, shape: &Shape) {
 	unsafe {
-		vulkan::ffi::cmd_bind_vb(connection,
+		asi_vulkan::cmd_bind_vb(connection,
 			cmdbuf,
 			&shape.buffers[..shape.num_buffers],
 			shape.offset);
 
-		vulkan::ffi::cmd_bind_pipeline(&connection,
+		asi_vulkan::cmd_bind_pipeline(&connection,
 			cmdbuf,
 			shape.instance.pipeline.pipeline);
 
-		vulkan::ffi::cmd_bind_descsets(&connection,
+		asi_vulkan::cmd_bind_descsets(&connection,
 			cmdbuf,
 			shape.instance.pipeline.pipeline_layout,
 			shape.instance.desc_set);
@@ -533,12 +476,14 @@ pub struct Renderer {
 	vw: Vw,
 	ar: f32,
 	connection: Connection,
-	opaque_octree: ::octree::Octree,
-	alpha_octree: ::octree::Octree,
-	opaque_points: ::octree::Points,
-	alpha_points: ::octree::Points,
-	opaque_shapes: Vec<Shape>,
-	alpha_shapes: Vec<Shape>,
+	opaque_octree: ::math::Octree<Shape>,
+	alpha_octree: ::math::Octree<Shape>,
+	opaque_sorted: Vec<u32>,
+	alpha_sorted: Vec<u32>,
+//	opaque_points: ::math::Points,
+//	alpha_points: ::math::Points,
+//	opaque_shapes: Vec<Shape>,
+//	alpha_shapes: Vec<Shape>,
 	models: Vec<Model>,
 	texcoords: Vec<TexCoords>,
 	gradients: Vec<Gradient>,
@@ -560,9 +505,10 @@ pub struct Renderer {
 	style_nacomplex: Style,
 	style_bcomplex: Style,
 	projection: ::Transform,
-	camera_buffer: vulkan::ffi::GpuBuffer,
-	camera_memory: vulkan::ffi::GpuMemory,
+	camera_buffer: asi_vulkan::GpuBuffer,
+	camera_memory: asi_vulkan::GpuMemory,
 	clear_color: (f32, f32, f32),
+	frustum: ::math::Frustum,
 }
 
 impl Renderer {
@@ -642,74 +588,76 @@ impl Renderer {
 			vw.device, include_bytes!(
 			"../native_renderer/vulkan/res/gradient-bfrag.spv"));
 
-		let style_solid = vulkan::ffi::new_pipeline(&connection,
+		let style_solid = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&solid_vert, &solid_frag, 0, 1, true);
-		let style_nasolid = vulkan::ffi::new_pipeline(&connection,
+		let style_nasolid = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&solid_vert, &solid_nafrag, 0, 1, false);
-		let style_bsolid = vulkan::ffi::new_pipeline(&connection,
+		let style_bsolid = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&solid_vert, &solid_bfrag, 0, 1, true);
-		let style_texture = vulkan::ffi::new_pipeline(&connection,
+		let style_texture = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&texture_vert, &texture_frag, 1, 2, true);
-		let style_natexture = vulkan::ffi::new_pipeline(&connection,
+		let style_natexture = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&texture_vert, &texture_nafrag, 1, 2, false);
-		let style_btexture = vulkan::ffi::new_pipeline(&connection,
+		let style_btexture = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&texture_vert, &texture_bfrag, 1, 2, true);
-		let style_gradient = vulkan::ffi::new_pipeline(&connection,
+		let style_gradient = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&gradient_vert, &gradient_frag, 0, 2, true);
-		let style_nagradient = vulkan::ffi::new_pipeline(&connection,
+		let style_nagradient = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&gradient_vert, &gradient_nafrag, 0, 2, false);
-		let style_bgradient = vulkan::ffi::new_pipeline(&connection,
+		let style_bgradient = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&gradient_vert, &gradient_bfrag, 0, 2, true);
-		let style_faded = vulkan::ffi::new_pipeline(&connection,
+		let style_faded = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&faded_vert, &faded_frag, 1, 2, true);
-		let style_bfaded = vulkan::ffi::new_pipeline(&connection,
+		let style_bfaded = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&faded_vert, &faded_bfrag, 1, 2, true);
-		let style_tinted = vulkan::ffi::new_pipeline(&connection,
+		let style_tinted = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&tinted_vert, &tinted_frag, 1, 2, true);
-		let style_natinted = vulkan::ffi::new_pipeline(&connection,
+		let style_natinted = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&tinted_vert, &tinted_nafrag, 1, 2, false);
-		let style_btinted = vulkan::ffi::new_pipeline(&connection,
+		let style_btinted = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&tinted_vert, &tinted_bfrag, 1, 2, true);
-		let style_complex = vulkan::ffi::new_pipeline(&connection,
+		let style_complex = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&complex_vert, &complex_frag, 1, 3, true);
-		let style_nacomplex = vulkan::ffi::new_pipeline(&connection,
+		let style_nacomplex = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&complex_vert, &complex_nafrag, 1, 3, false);
-		let style_bcomplex = vulkan::ffi::new_pipeline(&connection,
+		let style_bcomplex = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&complex_vert, &complex_bfrag, 1, 3, true);
 
 		let ar = vw.width as f32 / vw.height as f32;
 		let projection = projection(ar, 90.0);
 		let (camera_buffer, camera_memory) = unsafe {
-			ffi::vulkan::ffi::vw_camera_new(&connection, vw.device,
+			asi_vulkan::vw_camera_new(&connection, vw.device,
 				vw.gpu)
 		};
 
 		Renderer {
 			vw, ar, connection, projection, camera_buffer,
 			camera_memory,
-			alpha_octree: ::octree::Octree::new(),
-			opaque_octree: ::octree::Octree::new(),
-			alpha_points: ::octree::Points::new(),
-			opaque_points: ::octree::Points::new(),
-			alpha_shapes: Vec::new(),
-			opaque_shapes: Vec::new(),
+			alpha_octree: ::math::Octree::new(),
+			opaque_octree: ::math::Octree::new(),
+			opaque_sorted: Vec::new(),
+			alpha_sorted: Vec::new(),
+//			alpha_points: ::math::Points::new(),
+//			opaque_points: ::math::Points::new(),
+//			alpha_shapes: Vec::new(),
+//			opaque_shapes: Vec::new(),
 			gradients: Vec::new(),
 			models: Vec::new(),
 			texcoords: Vec::new(),
@@ -719,7 +667,9 @@ impl Renderer {
 			style_faded, style_bfaded,
 			style_tinted, style_natinted, style_btinted,
 			style_complex, style_nacomplex, style_bcomplex,
-			clear_color
+			clear_color,
+			frustum: ::math::Frustum::new(10.0, ar, 90.0,
+				2.0 * ((45.0 * ::std::f32::consts::PI / 180.0).tan() / ar).atan()), // TODO: FAR CLIP PLANE
 		}
 	}
 
@@ -727,25 +677,25 @@ impl Renderer {
 		self.clear_color = rgb;
 	}
 
-	pub fn update(&mut self, imatrix: [f32; 16]) {
+	pub fn update(&mut self, matrix: ::Transform, imatrix: ::Transform) {
 //		let color = self.color;
 //		let presenting_finish_sem;
 //		let rendering_finish_sem;
 
 		unsafe {
-			self.vw.presenting_complete_sem = vulkan::ffi::new_semaphore(
+			self.vw.presenting_complete_sem = asi_vulkan::new_semaphore(
 				&self.connection,
 				self.vw.device,
 			);
 
-			self.vw.next_image_index = vulkan::ffi::get_next_image(
+			self.vw.next_image_index = asi_vulkan::get_next_image(
 				&self.connection,
 				self.vw.device,
 				&mut self.vw.presenting_complete_sem,
 				self.vw.swapchain,
 			);
 
-			self.vw.rendering_complete_sem = vulkan::ffi::new_semaphore(
+			self.vw.rendering_complete_sem = asi_vulkan::new_semaphore(
 				&self.connection,
 				self.vw.device,
 			);
@@ -754,15 +704,23 @@ impl Renderer {
 				self.clear_color.1, self.clear_color.2);
 		}
 
-//		for shape in &self.shapes {
-		for id in self.opaque_octree.nearest(&self.opaque_points, imatrix) {
-			let shape = &self.opaque_shapes[*id as usize - 1];
+		let frustum = matrix * self.frustum;
+
+//		self.opaque_octree.print();
+//		println!("FRUSTUM {:?}", frustum);
+
+		self.opaque_octree.nearest(&mut self.opaque_sorted, imatrix.0,
+			frustum);
+		for id in self.opaque_sorted.iter() {
+			let shape = &self.opaque_octree[*id];
 
 			draw_shape(&self.connection, self.vw.command_buffer, shape);
 		}
 
-		for id in self.alpha_octree.farthest(&self.alpha_points, imatrix) {
-			let shape = &self.alpha_shapes[*id as usize - 1];
+		self.alpha_octree.farthest(&mut self.alpha_sorted, imatrix.0,
+			frustum);
+		for id in self.alpha_sorted.iter() {
+			let shape = &self.alpha_octree[*id];
 
 			draw_shape(&self.connection, self.vw.command_buffer, shape);
 		}
@@ -776,6 +734,9 @@ impl Renderer {
 		self.vw.width = size.0;
 		self.vw.height = size.1;
 		self.ar = size.0 as f32 / size.1 as f32;
+		self.frustum = ::math::Frustum::new(10.0, self.ar,
+			90.0, 2.0 * ((45.0 * ::std::f32::consts::PI / 180.0)
+				.tan() / self.ar).atan());
 
 		swapchain_delete(&self.connection, &mut self.vw);
 		swapchain_resize(&self.connection, &mut self.vw);
@@ -797,7 +758,7 @@ impl Renderer {
 	/// Push a model (collection of vertices) into graphics memory.
 	pub fn model(&mut self, vertices: &[f32], indices: &[u32]) -> usize {
 		let (vertex_buffer, vertex_memory, offset) = unsafe {
-			vulkan::ffi::new_shape(
+			asi_vulkan::new_shape(
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
@@ -860,7 +821,7 @@ impl Renderer {
 			indice_count: indices.len() as u32,
 			offset,
 			bounds: [(xmin, xmax), (ymin, ymax), (zmin, zmax)],
-			center: ::octree::geom::Vec3::new(xtot / n, ytot / n, ztot / n),
+			center: ::math::Vec3::new(xtot / n, ytot / n, ztot / n),
 		});
 
 		a
@@ -870,7 +831,7 @@ impl Renderer {
 	/// memory.
 	pub fn texcoords(&mut self, texcoords: &[f32]) -> usize {
 		let (vertex_buffer, vertex_memory) = unsafe {
-			vulkan::ffi::new_buffer(
+			asi_vulkan::new_buffer(
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
@@ -892,7 +853,7 @@ impl Renderer {
 	/// Push colors per vertex into graphics memory.
 	pub fn colors(&mut self, colors: &[f32]) -> usize {
 		let (vertex_buffer, vertex_memory) = unsafe {
-			vulkan::ffi::new_buffer(
+			asi_vulkan::new_buffer(
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
@@ -929,7 +890,7 @@ impl Renderer {
 
 		// Add an instance
 		let instance = unsafe {
-			vulkan::ffi::vw_instance_new(
+			asi_vulkan::vw_instance_new(
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
@@ -967,22 +928,13 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
+			position: self.models[model].center,
 		};
 
 		if alpha {
-			self.alpha_shapes.push(shape);
-			self.alpha_points.add(self.models[model].center);
-			let a = self.alpha_octree.len();
-			self.alpha_octree.add(self.alpha_shapes.len() as u32,
-				&self.alpha_points);
-			ShapeHandle::Alpha(a)
+			ShapeHandle::Alpha(self.alpha_octree.add(shape))
 		} else {
-			self.opaque_shapes.push(shape);
-			self.opaque_points.add(self.models[model].center);
-			let a = self.opaque_octree.len() as u32;
-			self.opaque_octree.add(self.opaque_shapes.len() as u32,
-				&self.opaque_points);
-			ShapeHandle::Opaque(a)
+			ShapeHandle::Opaque(self.opaque_octree.add(shape))
 		}
 	}
 
@@ -1000,7 +952,7 @@ impl Renderer {
 
 		// Add an instance
 		let instance = unsafe {
-			vulkan::ffi::vw_instance_new(
+			asi_vulkan::vw_instance_new(
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
@@ -1038,22 +990,13 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
+			position: self.models[model].center,
 		};
 
 		if alpha {
-			self.alpha_shapes.push(shape);
-			self.alpha_points.add(self.models[model].center);
-			let a = self.alpha_octree.len();
-			self.alpha_octree.add(self.alpha_shapes.len() as u32,
-				&self.alpha_points);
-			ShapeHandle::Alpha(a)
+			ShapeHandle::Alpha(self.alpha_octree.add(shape))
 		} else {
-			self.opaque_shapes.push(shape);
-			self.opaque_points.add(self.models[model].center);
-			let a = self.opaque_octree.len() as u32;
-			self.opaque_octree.add(self.opaque_shapes.len() as u32,
-				&self.opaque_points);
-			ShapeHandle::Opaque(a)
+			ShapeHandle::Opaque(self.opaque_octree.add(shape))
 		}
 	}
 
@@ -1076,7 +1019,7 @@ impl Renderer {
 
 		// Add an instance
 		let instance = unsafe {
-			vulkan::ffi::vw_instance_new(
+			asi_vulkan::vw_instance_new(
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
@@ -1114,22 +1057,13 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
+			position: self.models[model].center,
 		};
 
 		if alpha {
-			self.alpha_shapes.push(shape);
-			self.alpha_points.add(self.models[model].center);
-			let a = self.alpha_octree.len();
-			self.alpha_octree.add(self.alpha_shapes.len() as u32,
-				&self.alpha_points);
-			ShapeHandle::Alpha(a)
+			ShapeHandle::Alpha(self.alpha_octree.add(shape))
 		} else {
-			self.opaque_shapes.push(shape);
-			self.opaque_points.add(self.models[model].center);
-			let a = self.opaque_octree.len() as u32;
-			self.opaque_octree.add(self.opaque_shapes.len() as u32,
-				&self.opaque_points);
-			ShapeHandle::Opaque(a)
+			ShapeHandle::Opaque(self.opaque_octree.add(shape))
 		}
 	}
 
@@ -1152,7 +1086,7 @@ impl Renderer {
 
 		// Add an instance
 		let instance = unsafe {
-			vulkan::ffi::vw_instance_new(
+			asi_vulkan::vw_instance_new(
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
@@ -1186,14 +1120,10 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
+			position: self.models[model].center,
 		};
 
-		self.alpha_shapes.push(shape);
-		self.alpha_points.add(self.models[model].center);
-		let a = self.alpha_octree.len();
-		self.alpha_octree.add(self.alpha_shapes.len() as u32,
-			&self.alpha_points);
-		ShapeHandle::Alpha(a)
+		ShapeHandle::Alpha(self.alpha_octree.add(shape))
 	}
 
 	pub fn tinted(&mut self, model: usize, texture: Texture,
@@ -1216,7 +1146,7 @@ impl Renderer {
 
 		// Add an instance
 		let instance = unsafe {
-			vulkan::ffi::vw_instance_new(
+			asi_vulkan::vw_instance_new(
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
@@ -1254,22 +1184,13 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
+			position: self.models[model].center,
 		};
 
 		if alpha {
-			self.alpha_shapes.push(shape);
-			self.alpha_points.add(self.models[model].center);
-			let a = self.alpha_octree.len();
-			self.alpha_octree.add(self.alpha_shapes.len() as u32,
-				&self.alpha_points);
-			ShapeHandle::Alpha(a)
+			ShapeHandle::Alpha(self.alpha_octree.add(shape))
 		} else {
-			self.opaque_shapes.push(shape);
-			self.opaque_points.add(self.models[model].center);
-			let a = self.opaque_octree.len() as u32;
-			self.opaque_octree.add(self.opaque_shapes.len() as u32,
-				&self.opaque_points);
-			ShapeHandle::Opaque(a)
+			ShapeHandle::Opaque(self.opaque_octree.add(shape))
 		}
 	}
 
@@ -1294,7 +1215,7 @@ impl Renderer {
 
 		// Add an instance
 		let instance = unsafe {
-			vulkan::ffi::vw_instance_new(
+			asi_vulkan::vw_instance_new(
 				&self.connection,
 				self.vw.device,
 				self.vw.gpu,
@@ -1332,26 +1253,17 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
+			position: self.models[model].center,
 		};
 
 		if alpha {
-			self.alpha_shapes.push(shape);
-			self.alpha_points.add(self.models[model].center);
-			let a = self.alpha_octree.len();
-			self.alpha_octree.add(self.alpha_shapes.len() as u32,
-				&self.alpha_points);
-			ShapeHandle::Alpha(a)
+			ShapeHandle::Alpha(self.alpha_octree.add(shape))
 		} else {
-			self.opaque_shapes.push(shape);
-			self.opaque_points.add(self.models[model].center);
-			let a = self.opaque_octree.len() as u32;
-			self.opaque_octree.add(self.opaque_shapes.len() as u32,
-				&self.opaque_points);
-			ShapeHandle::Opaque(a)
+			ShapeHandle::Opaque(self.opaque_octree.add(shape))
 		}
 	}
 
-	pub fn transform(&mut self, shape: &ShapeHandle,
+	pub fn transform(&mut self, shape: &mut ShapeHandle,
 		transform: &::Transform)
 	{
 		let uniform = TransformUniform {
@@ -1359,24 +1271,34 @@ impl Renderer {
 		};
 
 		match *shape {
-			ShapeHandle::Opaque(x) => {
-				self.opaque_octree.remove(x + 1, &self.opaque_points);
-				self.opaque_points.wrt(x + 1, ::Transform(transform.0)
-					* self.opaque_shapes[x as usize].center);
-				self.opaque_octree.add(x + 1, &self.opaque_points);
+			ShapeHandle::Opaque(ref mut x) => {
+				let mut shape = self.opaque_octree[*x].clone();
+
+				shape.position = ::Transform(transform.0) *
+					self.opaque_octree[*x].center;
+				self.opaque_octree.modify(x, shape);
+/*				self.opaque_octree.remove(x, &self.opaque_points);
+				self.opaque_points.wrt(x, ::Transform(transform.0)
+					* self.opaque_shapes[x as usize - 1].center);
+				self.opaque_octree.add(x, &self.opaque_points);*/
 
 				vulkan::copy_memory(&self.connection, self.vw.device,
-					self.opaque_shapes[x as usize].instance.uniform_memory,
+					self.opaque_octree[*x].instance.uniform_memory,
 					&uniform, mem::size_of::<TransformUniform>());
 			},
-			ShapeHandle::Alpha(x) => {
-				self.alpha_octree.remove(x + 1, &self.alpha_points);
-				self.alpha_points.wrt(x + 1, ::Transform(transform.0)
-					* self.alpha_shapes[x as usize].center);
-				self.alpha_octree.add(x + 1, &self.alpha_points);
+			ShapeHandle::Alpha(ref mut x) => {
+				let mut shape = self.alpha_octree[*x].clone();
+
+				shape.position = ::Transform(transform.0) *
+					self.alpha_octree[*x].center;
+				self.alpha_octree.modify(x, shape);
+/*				self.alpha_octree.remove(x, &self.alpha_points);
+				self.alpha_points.wrt(x, ::Transform(transform.0)
+					* self.alpha_shapes[x as usize - 1].center);
+				self.alpha_octree.add(x, &self.alpha_points);*/
 
 				vulkan::copy_memory(&self.connection, self.vw.device,
-					self.alpha_shapes[x as usize].instance.uniform_memory,
+					self.alpha_octree[*x].instance.uniform_memory,
 					&uniform, mem::size_of::<TransformUniform>());
 			},
 		}
@@ -1399,9 +1321,9 @@ impl Drop for Renderer {
 		swapchain_delete(&self.connection, &mut self.vw);
 
 		unsafe {
-			ffi::vulkan::ffi::destroy_surface(&self.connection,
+			asi_vulkan::destroy_surface(&self.connection,
 				self.vw.surface);
-			ffi::vulkan::ffi::destroy_instance(&self.connection);
+			asi_vulkan::destroy_instance(&self.connection);
 		}
 	}
 }

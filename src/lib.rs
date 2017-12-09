@@ -16,12 +16,13 @@ extern crate afi;
 
 /// Transform represents a transformation matrix.
 #[must_use]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Transform(pub [f32; 16]);
 
 mod renderer;
 mod render_ops;
-mod ali_vulkan;
-mod octree;
+mod asi_vulkan;
+mod math;
 
 pub mod input {
 	pub use awi::Msg;
@@ -74,10 +75,15 @@ impl Display {
 
 	/// Update the display / window.
 	pub fn update(&mut self) {
-		self.renderer.update(Transform::new()
-			.translate(-self.xyz.0, -self.xyz.1, -self.xyz.2)
-			.rotate(-self.rotate_xyz.0, -self.rotate_xyz.1,
-				-self.rotate_xyz.2).0,
+		self.renderer.update(
+			Transform::new()
+				.rotate(self.rotate_xyz.0, self.rotate_xyz.1,
+					self.rotate_xyz.2)
+				.translate(self.xyz.0, self.xyz.1, self.xyz.2),
+			Transform::new()
+				.translate(-self.xyz.0, -self.xyz.1, -self.xyz.2)
+				.rotate(-self.rotate_xyz.0, -self.rotate_xyz.1,
+					-self.rotate_xyz.2),
 			
 		);
 		self.window.update();
@@ -143,8 +149,8 @@ pub struct Shape(renderer::ShapeHandle);
 
 impl Shape {
 	/// `Transform` the `Shape`
-	pub fn transform(&self, display: &mut Display, transform: &Transform) {
-		display.renderer.transform(&self.0, transform);
+	pub fn transform(&mut self, display: &mut Display, transform: &Transform) {
+		display.renderer.transform(&mut self.0, transform);
 	}
 }
 
@@ -299,15 +305,79 @@ impl Transform {
 	}
 }
 
-impl ::std::ops::Mul<octree::geom::Vec3> for Transform {
-	type Output = octree::geom::Vec3;
+impl ::std::ops::Mul<math::Frustum> for Transform {
+	type Output = math::Frustum;
 
-	fn mul(self, rhs: octree::geom::Vec3) -> Self::Output {
+	fn mul(self, rhs: math::Frustum) -> Self::Output {
+		math::Frustum {
+			near: self * rhs.near,
+			far: self * rhs.far,
+			top: self * rhs.top,
+			bottom: self * rhs.bottom,
+			right: self * rhs.right,
+			left: self * rhs.left,
+		}
+	}
+}
+
+impl ::std::ops::Mul<math::Plane> for Transform {
+	type Output = math::Plane;
+
+	fn mul(self, rhs: math::Plane) -> Self::Output {
+		let facing = rhs.facing.transform_dir(self);
+		// translation vector
+		let t = math::Vec3::new(self.0[12], self.0[13], self.0[14]);
+		//
+		if t == math::Vec3::zero() {
+			return math::Plane { facing, offset: rhs.offset };
+		}
+		// Angle between normal and translation
+		let mut a = facing.angle(t).abs();
+
+		// If more than full circle, reduce
+		while a > ::std::f32::consts::PI * 2.0 {
+			a -= ::std::f32::consts::PI * 2.0;
+		}
+
+		let mut b = 1.0;
+
+		// If value is over 90° it can be reduced
+		if a > ::std::f32::consts::PI / 2.0 {
+			// 90°-180° quadrant
+			if a < ::std::f32::consts::PI {
+				a = ::std::f32::consts::PI - a;
+				b = -b;
+			// 180°-270° quadrant
+			} else if a < 3.0 * ::std::f32::consts::PI / 2.0 {
+				a -= ::std::f32::consts::PI;
+				b = -b;
+			// 270°-360° quadrant
+			} else {
+				a = (2.0 * ::std::f32::consts::PI) - a;
+			}
+		}
+
+		// if a == 90°
+		let offset = rhs.offset + if a >= ::std::f32::consts::PI / 2.0 {
+			0.0
+		} else {
+			a.cos() * t.mag() * b
+		};
+
+		math::Plane { facing, offset }
+	}
+}
+
+impl ::std::ops::Mul<math::Vec3<f32>> for Transform {
+	type Output = math::Vec3<f32>;
+
+	/// Transform as a position.
+	fn mul(self, rhs: math::Vec3<f32>) -> Self::Output {
 		let x = self.0[0]*rhs.x + self.0[4]*rhs.y + self.0[8]*rhs.z + self.0[12]*1.0;
 		let y = self.0[1]*rhs.x + self.0[5]*rhs.y + self.0[9]*rhs.z + self.0[13]*1.0;
 		let z = self.0[2]*rhs.x + self.0[6]*rhs.y + self.0[10]*rhs.z + self.0[14]*1.0;
 
-		octree::geom::Vec3::new(x, y, z)
+		math::Vec3::new(x, y, z)
 	}
 }
 

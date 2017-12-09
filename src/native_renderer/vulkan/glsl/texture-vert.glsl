@@ -19,8 +19,10 @@ layout (location = 0) in vec4 pos;
 layout (location = 1) in vec4 texpos;
 
 layout (location = 0) out vec4 texcoord;
+layout (location = 1) out float z;
 
 void main() {
 	texcoord = texpos;
 	gl_Position = camera.matrix * (uniforms.models_tfm * pos);
+	z = gl_Position.z;
 }
