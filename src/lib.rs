@@ -36,8 +36,6 @@ pub use renderer::Texture;
 pub struct Display {
 	window: awi::Window,
 	renderer: renderer::Renderer,
-	xyz: (f32,f32,f32),
-	rotate_xyz: (f32,f32,f32),
 }
 
 impl Display {
@@ -52,8 +50,7 @@ impl Display {
 		let renderer = renderer::Renderer::new(name,
 			window.get_connection(), bg_color, fog);
 
-		Display { window, renderer, xyz: (0.0, 0.0, 0.0),
-			rotate_xyz: (0.0, 0.0, 0.0) }
+		Display { window, renderer }
 	}
 
 	/// Change the background color of the `Display`.
@@ -74,30 +71,14 @@ impl Display {
 
 	/// Update the display / window.
 	pub fn update(&mut self) {
-		self.renderer.update(
-			Transform::new()
-				.rotate(self.rotate_xyz.0, self.rotate_xyz.1,
-					self.rotate_xyz.2)
-				.translate(self.xyz.0, self.xyz.1, self.xyz.2),
-			Transform::new()
-				.translate(-self.xyz.0, -self.xyz.1, -self.xyz.2)
-				.rotate(-self.rotate_xyz.0, -self.rotate_xyz.1,
-					-self.rotate_xyz.2),
-			
-		);
+		self.renderer.update();
 		self.window.update();
 	}
 
 	/// Update the camera position and angle.
 	pub fn camera(&mut self, xyz: (f32,f32,f32), rotate_xyz: (f32,f32,f32)) {
-		let camera_transform = Transform::new()
-			.translate(-xyz.0, -xyz.1, -xyz.2)
-			.rotate(-rotate_xyz.0, -rotate_xyz.1, -rotate_xyz.2);
-
-		self.xyz = xyz;
-		self.rotate_xyz = rotate_xyz;
-
-		self.renderer.camera(&camera_transform);
+		self.renderer.set_camera(xyz, rotate_xyz);
+		self.renderer.camera();
 	}
 }
 

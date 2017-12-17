@@ -148,17 +148,12 @@ impl Node {
 
 		false
 	}
-	/// Get a vector containing the leaf children
-	fn leaf_children(&self) -> Vec<u32> {
+	/// Get an array containing the leaf children
+	fn leaf_children(&self) -> [u32; 6] {
 		assert!(self.is_leaf());
-		let mut children = Vec::new();
-		for ch in 1 .. 7 {
-			let hnd = self.child[ch];
-			if hnd > 0 {
-				children.push(hnd);
-			}
-		}
-		children
+
+		[self.child[1], self.child[2], self.child[3], self.child[4],
+			self.child[5], self.child[6]]
 	}
 	/// Determine which child for a branch point
 	fn which_child(c: Vec3i, p: Vec3i) -> usize {
@@ -357,20 +352,22 @@ impl<T> Octree<T> where T: Pos {
 		assert!(self.nodes[i].is_full());
 		let mut br = Node::new_branch();
 		let link = self.nodes[i].link() as u32;
-		for hnd in self.nodes[i].leaf_children() {
-			let p = self[hnd].posi();
+		for hnd in self.nodes[i].leaf_children().iter() {
+			if *hnd < 1 { continue; }
+
+			let p = self[*hnd].posi();
 			let ch = Node::which_child(center, p);
 			let j = br.child[ch] as usize;
 			if j > 0 {
 				// NOTE: if there is a link, all children
 				//       must be coincident
 				assert!(self.nodes[j - 1].link() as u32 == link);
-				self.nodes[j - 1].add_leaf(hnd);
+				self.nodes[j - 1].add_leaf(*hnd);
 			} else {
 				let k = self.new_leaf();
 				// Preserve link to coincident leaves
 				self.nodes[k - 1].child[LINK] = link;
-				self.nodes[k - 1].add_leaf(hnd);
+				self.nodes[k - 1].add_leaf(*hnd);
 				br.child[ch] = k as u32;
 			}
 		}
@@ -437,11 +434,13 @@ impl<T> Octree<T> where T: Pos {
 		frustum: Frustum, bbox: BBox<i32>)
 	{
 		if self.nodes[i].is_leaf() {
-			for hnd in self.nodes[i].leaf_children() {
+			for hnd in self.nodes[i].leaf_children().iter() {
+				if *hnd < 1 { continue; }
+
 				if frustum.collide_point(
-					self[hnd].posf())
+					self[*hnd].posf())
 				{
-					sorted.push(hnd);
+					sorted.push(*hnd);
 				}
 			}
 			let j = self.nodes[i].link();
@@ -464,9 +463,7 @@ impl<T> Octree<T> where T: Pos {
 		}
 	}
 	/// Sort by z value.  nr => true if Near Sort, nr => false if Far Sort
-	fn zsort(&mut self, sorted: &mut Vec<u32>, mat4: [f32; 16], nr: bool,
-		frustum: Frustum)
-	{
+	fn zsort(&mut self, sorted: &mut Vec<u32>, nr: bool, frustum: Frustum) {
 		sorted.clear();
 
 		if self.root == 0 {
@@ -479,14 +476,12 @@ impl<T> Octree<T> where T: Pos {
 		self.find_node_ch(sorted, hnd, frustum, bbox);
 
 		sorted.sort_unstable_by(|a, b| {
-			let p = self[*a].posf();
-			let z1 = mat4[2] * p.x + mat4[6] * p.y + mat4[10] * p.z + mat4[14] * 1.0;
-			let p = self[*b].posf();
-			let z2 = mat4[2] * p.x + mat4[6] * p.y + mat4[10] * p.z + mat4[14] * 1.0;
+			let p1 = self[*a].posf() - frustum.center;
+			let p2 = self[*b].posf() - frustum.center;
 
-			if z1 > z2 {
+			if p1.mag() > p2.mag() {
 				if nr {Ordering::Greater} else {Ordering::Less}
-			} else if z1 < z2 {
+			} else if p1.mag() < p2.mag() {
 				if nr {Ordering::Less} else {Ordering::Greater}
 			} else {
 				Ordering::Equal
@@ -496,18 +491,14 @@ impl<T> Octree<T> where T: Pos {
 
 	/// Sort the octree nearest to farthest, while culling all outside of
 	/// view frustum.
-	pub fn nearest(&mut self, sorted: &mut Vec<u32>, mat4: [f32; 16],
-		frustum: Frustum)
-	{
-		self.zsort(sorted, mat4, true, frustum)
+	pub fn nearest(&mut self, sorted: &mut Vec<u32>, frustum: Frustum) {
+		self.zsort(sorted, true, frustum)
 	}
 
 	/// Sort the octree farthest to nearest, while culling all outside of
 	/// view frustum.
-	pub fn farthest(&mut self, sorted: &mut Vec<u32>, mat4: [f32; 16],
-		frustum: Frustum)
-	{
-		self.zsort(sorted, mat4, false, frustum)
+	pub fn farthest(&mut self, sorted: &mut Vec<u32>, frustum: Frustum) {
+		self.zsort(sorted, false, frustum)
 	}
 	/// Print the octree
 	pub fn print(&self) {
@@ -523,9 +514,11 @@ impl<T> Octree<T> where T: Pos {
 		}
 		if n.is_leaf() {
 			print!("leaf:");
-			for hnd in n.leaf_children() {
-				let p = self[hnd].posi();
-				print!(" {:?}_{:?}", hnd, p);
+			for hnd in n.leaf_children().iter() {
+				if *hnd < 1 { continue; }
+
+				let p = self[*hnd].posi();
+				print!(" {:?}_{:?}", *hnd, p);
 			}
 			print!("\t{:?}", bbox);
 			let j = n.link();
@@ -558,12 +551,14 @@ impl<T> Octree<T> where T: Pos {
 		let n = &self.nodes[i];
 
 		if n.is_leaf() {
-			for hnd in n.leaf_children() {
-				let p = self[hnd].posi();
+			for hnd in n.leaf_children().iter() {
+				if *hnd < 1 { continue; }
+
+				let p = self[*hnd].posi();
 
 				if !bbox.contains(p) {
 					self.print();
-					panic!("Corrupt Octree at HND: {} P: {:?} BBOX: {:?}", hnd, p, bbox);
+					panic!("Corrupt Octree at HND: {} P: {:?} BBOX: {:?}", *hnd, p, bbox);
 				}
 			}
 			let j = n.link();

@@ -514,6 +514,8 @@ pub struct Renderer {
 	effect_memory: asi_vulkan::Memory<FogUniform>,
 	clear_color: (f32, f32, f32),
 	frustum: ::math::Frustum,
+	xyz: (f32,f32,f32),
+	rotate_xyz: (f32,f32,f32),
 }
 
 impl Renderer {
@@ -653,7 +655,7 @@ impl Renderer {
 					1.0), (fog.0, fog.1))
 		};
 
-		Renderer {
+		let mut renderer = Renderer {
 			vw, ar, connection, projection,
 			camera_memory, effect_memory,
 			alpha_octree: ::math::Octree::new(),
@@ -679,17 +681,24 @@ impl Renderer {
 				fog.0 + fog.1, 90.0,
 				2.0 * ((45.0 * ::std::f32::consts::PI / 180.0).tan() / ar).atan(),
 				0.0, 0.0), // TODO: FAR CLIP PLANE
-		}
+			xyz: (0.0, 0.0, 0.0),
+			rotate_xyz: (0.0, 0.0, 0.0),
+		};
+
+		renderer.camera();
+
+		renderer
 	}
 
 	pub fn bg_color(&mut self, rgb: (f32, f32, f32)) {
 		self.clear_color = rgb;
 	}
 
-	pub fn update(&mut self, matrix: ::Transform, imatrix: ::Transform) {
-//		let color = self.color;
-//		let presenting_finish_sem;
-//		let rendering_finish_sem;
+	pub fn update(&mut self) {
+		let matrix = ::Transform::new()
+			.rotate(self.rotate_xyz.0, self.rotate_xyz.1,
+				self.rotate_xyz.2)
+			.translate(self.xyz.0, self.xyz.1, self.xyz.2);
 
 		unsafe {
 			self.vw.presenting_complete_sem = asi_vulkan::new_semaphore(
@@ -718,16 +727,14 @@ impl Renderer {
 //		self.opaque_octree.print();
 //		println!("FRUSTUM {:?}", frustum);
 
-		self.opaque_octree.nearest(&mut self.opaque_sorted, imatrix.0,
-			frustum);
+		self.opaque_octree.nearest(&mut self.opaque_sorted, frustum);
 		for id in self.opaque_sorted.iter() {
 			let shape = &self.opaque_octree[*id];
 
 			draw_shape(&self.connection, self.vw.command_buffer, shape);
 		}
 
-		self.alpha_octree.farthest(&mut self.alpha_sorted, imatrix.0,
-			frustum);
+		self.alpha_octree.farthest(&mut self.alpha_sorted, frustum);
 		for id in self.alpha_sorted.iter() {
 			let shape = &self.alpha_octree[*id];
 
@@ -754,6 +761,7 @@ impl Renderer {
 		swapchain_resize(&self.connection, &mut self.vw);
 
 		self.projection = projection(self.ar, 90.0);
+		self.camera();
 	}
 
 	pub fn texture(&mut self, width: u32, height: u32, rgba: &[u32])
@@ -1253,10 +1261,6 @@ impl Renderer {
 				shape.position = ::Transform(transform.0) *
 					self.opaque_octree[*x].center;
 				self.opaque_octree.modify(x, shape);
-/*				self.opaque_octree.remove(x, &self.opaque_points);
-				self.opaque_points.wrt(x, ::Transform(transform.0)
-					* self.opaque_shapes[x as usize - 1].center);
-				self.opaque_octree.add(x, &self.opaque_points);*/
 
 				vulkan::copy_memory(&self.connection, self.vw.device,
 					self.opaque_octree[*x].instance.uniform_memory,
@@ -1268,10 +1272,6 @@ impl Renderer {
 				shape.position = ::Transform(transform.0) *
 					self.alpha_octree[*x].center;
 				self.alpha_octree.modify(x, shape);
-/*				self.alpha_octree.remove(x, &self.alpha_points);
-				self.alpha_points.wrt(x, ::Transform(transform.0)
-					* self.alpha_shapes[x as usize - 1].center);
-				self.alpha_octree.add(x, &self.alpha_points);*/
 
 				vulkan::copy_memory(&self.connection, self.vw.device,
 					self.alpha_octree[*x].instance.uniform_memory,
@@ -1280,8 +1280,18 @@ impl Renderer {
 		}
 	}
 
-	pub fn camera(&mut self, transform: &::Transform) {
-		self.camera_memory.data.mat4 = ::Transform(transform.0)
+	pub fn set_camera(&mut self, xyz: (f32,f32,f32),
+		rotate_xyz: (f32,f32,f32))
+	{
+		self.xyz = xyz;
+		self.rotate_xyz = rotate_xyz;
+	}
+
+	pub fn camera(&mut self) {
+		self.camera_memory.data.mat4 = ::Transform::new()
+			.translate(-self.xyz.0, -self.xyz.1, -self.xyz.2)
+			.rotate(-self.rotate_xyz.0, -self.rotate_xyz.1,
+				-self.rotate_xyz.2)
 			.matrix(self.projection.0).0;
 
 		self.camera_memory.update(&self.connection);
