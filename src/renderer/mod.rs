@@ -19,18 +19,23 @@ use asi_vulkan;
 use asi_vulkan::types::*;
 use asi_vulkan::Connection;
 
-#[repr(C)] struct TransformAndFadeUniform {
+#[derive(Clone)] #[repr(C)] struct TransformAndFadeUniform {
 	mat4: [f32; 16],
 	fade: f32,
 }
 
-#[repr(C)] struct TransformAndColorUniform {
+#[derive(Clone)] #[repr(C)] struct TransformAndColorUniform {
 	mat4: [f32; 16],
 	vec4: [f32; 4],
 }
 
-#[repr(C)] struct TransformUniform {
-	mat4: [f32; 16],
+#[derive(Clone)] #[repr(C)] pub(crate) struct TransformUniform {
+	pub mat4: [f32; 16],
+}
+
+#[derive(Clone)] #[repr(C)] pub(crate) struct FogUniform {
+	pub fogc: [f32; 4],
+	pub fogr: [f32; 2],
 }
 
 pub enum ShapeHandle {
@@ -505,8 +510,8 @@ pub struct Renderer {
 	style_nacomplex: Style,
 	style_bcomplex: Style,
 	projection: ::Transform,
-	camera_buffer: asi_vulkan::GpuBuffer,
-	camera_memory: asi_vulkan::GpuMemory,
+	camera_memory: asi_vulkan::Memory<TransformUniform>,
+	effect_memory: asi_vulkan::Memory<FogUniform>,
 	clear_color: (f32, f32, f32),
 	frustum: ::math::Frustum,
 }
@@ -642,14 +647,15 @@ impl Renderer {
 
 		let ar = vw.width as f32 / vw.height as f32;
 		let projection = projection(ar, 90.0);
-		let (camera_buffer, camera_memory) = unsafe {
-			asi_vulkan::vw_camera_new(&connection, vw.device,
-				vw.gpu)
+		let (camera_memory, effect_memory) = unsafe {
+			asi_vulkan::vw_camera_new(&connection,vw.device,vw.gpu,
+				(clear_color.0, clear_color.1, clear_color.2,
+					1.0), (5.0, 2.5))
 		};
 
 		Renderer {
-			vw, ar, connection, projection, camera_buffer,
-			camera_memory,
+			vw, ar, connection, projection,
+			camera_memory, effect_memory,
 			alpha_octree: ::math::Octree::new(),
 			opaque_octree: ::math::Octree::new(),
 			opaque_sorted: Vec::new(),
@@ -881,13 +887,6 @@ impl Renderer {
 			panic!("TexCoord length doesn't match vertex length");
 		}
 
-		let uniform = TransformUniform {
-			mat4: [	1.0, 0.0, 0.0, 0.0,
-				0.0, 1.0, 0.0, 0.0,
-				0.0, 0.0, 1.0, 0.0,
-				0.0, 0.0, 0.0, 1.0],
-		};
-
 		// Add an instance
 		let instance = unsafe {
 			asi_vulkan::vw_instance_new(
@@ -903,18 +902,19 @@ impl Renderer {
 						self.style_natexture
 					}
 				},
-				mem::size_of::<TransformUniform>(),
-				&self.camera_buffer, // TODO: at shader creation, not shape creation
-				mem::size_of::<TransformUniform>(),
+				TransformUniform {
+					mat4: [	1.0, 0.0, 0.0, 0.0,
+						0.0, 1.0, 0.0, 0.0,
+						0.0, 0.0, 1.0, 0.0,
+						0.0, 0.0, 0.0, 1.0],
+				},
+				&self.camera_memory, // TODO: at shader creation, not shape creation
+				&self.effect_memory,
 				texture.view,
 				texture.sampler,
 				true, // 1 texure
 			)
 		};
-
-		vulkan::copy_memory(&self.connection, self.vw.device,
-			instance.uniform_memory, &uniform,
-			mem::size_of::<TransformUniform>());
 
 		let shape = Shape {
 			instance,
@@ -942,14 +942,6 @@ impl Renderer {
 		blend: bool)
 		-> ShapeHandle
 	{
-		let matrix = TransformAndColorUniform {
-			vec4: color,
-			mat4: [	1.0, 0.0, 0.0, 0.0,
-				0.0, 1.0, 0.0, 0.0,
-				0.0, 0.0, 1.0, 0.0,
-				0.0, 0.0, 0.0, 1.0 ],
-		};
-
 		// Add an instance
 		let instance = unsafe {
 			asi_vulkan::vw_instance_new(
@@ -965,18 +957,20 @@ impl Renderer {
 						self.style_nasolid
 					}
 				},
-				mem::size_of::<TransformAndColorUniform>(),
-				&self.camera_buffer,
-				mem::size_of::<TransformUniform>(),
+				TransformAndColorUniform {
+					vec4: color,
+					mat4: [	1.0, 0.0, 0.0, 0.0,
+						0.0, 1.0, 0.0, 0.0,
+						0.0, 0.0, 1.0, 0.0,
+						0.0, 0.0, 0.0, 1.0 ],
+				},
+				&self.camera_memory,
+				&self.effect_memory,
 				mem::zeroed(),
 				mem::zeroed(),
 				false, // no texure
 			)
 		};
-
-		vulkan::copy_memory(&self.connection, self.vw.device,
-			instance.uniform_memory, &matrix,
-			mem::size_of::<TransformAndColorUniform>());
 
 		let shape = Shape {
 			instance,
@@ -1010,13 +1004,6 @@ impl Renderer {
 			panic!("TexCoord length doesn't match gradient length");
 		}
 
-		let uniform = TransformUniform {
-			mat4: [	1.0, 0.0, 0.0, 0.0,
-				0.0, 1.0, 0.0, 0.0,
-				0.0, 0.0, 1.0, 0.0,
-				0.0, 0.0, 0.0, 1.0],
-		};
-
 		// Add an instance
 		let instance = unsafe {
 			asi_vulkan::vw_instance_new(
@@ -1032,18 +1019,19 @@ impl Renderer {
 						self.style_nagradient
 					}
 				},
-				mem::size_of::<TransformUniform>(),
-				&self.camera_buffer,
-				mem::size_of::<TransformUniform>(),
+				TransformUniform {
+					mat4: [	1.0, 0.0, 0.0, 0.0,
+						0.0, 1.0, 0.0, 0.0,
+						0.0, 0.0, 1.0, 0.0,
+						0.0, 0.0, 0.0, 1.0],
+				},
+				&self.camera_memory,
+				&self.effect_memory,
 				mem::zeroed(),
 				mem::zeroed(),
 				false, // no texure
 			)
 		};
-
-		vulkan::copy_memory(&self.connection, self.vw.device,
-			instance.uniform_memory, &uniform,
-			mem::size_of::<TransformUniform>());
 
 		let shape = Shape {
 			instance,
@@ -1076,14 +1064,6 @@ impl Renderer {
 			panic!("TexCoord length doesn't match vertex length");
 		}
 
-		let uniform = TransformAndFadeUniform {
-			mat4: [	1.0, 0.0, 0.0, 0.0,
-				0.0, 1.0, 0.0, 0.0,
-				0.0, 0.0, 1.0, 0.0,
-				0.0, 0.0, 0.0, 1.0],
-			fade: fade_factor,
-		};
-
 		// Add an instance
 		let instance = unsafe {
 			asi_vulkan::vw_instance_new(
@@ -1095,18 +1075,20 @@ impl Renderer {
 				} else {
 					self.style_faded
 				},
-				mem::size_of::<TransformAndFadeUniform>(),
-				&self.camera_buffer,
-				mem::size_of::<TransformUniform>(),
+				TransformAndFadeUniform {
+					mat4: [	1.0, 0.0, 0.0, 0.0,
+						0.0, 1.0, 0.0, 0.0,
+						0.0, 0.0, 1.0, 0.0,
+						0.0, 0.0, 0.0, 1.0],
+					fade: fade_factor,
+				},
+				&self.camera_memory,
+				&self.effect_memory,
 				texture.view,
 				texture.sampler,
 				true, // 1 texure
 			)
 		};
-
-		vulkan::copy_memory(&self.connection, self.vw.device,
-			instance.uniform_memory, &uniform,
-			mem::size_of::<TransformAndFadeUniform>());
 
 		let shape = Shape {
 			instance,
@@ -1136,14 +1118,6 @@ impl Renderer {
 			panic!("TexCoord length doesn't match vertex length");
 		}
 
-		let uniform = TransformAndColorUniform {
-			mat4: [	1.0, 0.0, 0.0, 0.0,
-				0.0, 1.0, 0.0, 0.0,
-				0.0, 0.0, 1.0, 0.0,
-				0.0, 0.0, 0.0, 1.0],
-			vec4: color,
-		};
-
 		// Add an instance
 		let instance = unsafe {
 			asi_vulkan::vw_instance_new(
@@ -1159,18 +1133,20 @@ impl Renderer {
 						self.style_natinted
 					}
 				},
-				mem::size_of::<TransformAndColorUniform>(),
-				&self.camera_buffer,
-				mem::size_of::<TransformUniform>(),
+				TransformAndColorUniform {
+					mat4: [	1.0, 0.0, 0.0, 0.0,
+						0.0, 1.0, 0.0, 0.0,
+						0.0, 0.0, 1.0, 0.0,
+						0.0, 0.0, 0.0, 1.0],
+					vec4: color,
+				},
+				&self.camera_memory,
+				&self.effect_memory,
 				texture.view,
 				texture.sampler,
 				true, // 1 texure
 			)
 		};
-
-		vulkan::copy_memory(&self.connection, self.vw.device,
-			instance.uniform_memory, &uniform,
-			mem::size_of::<TransformAndColorUniform>());
 
 		let shape = Shape {
 			instance,
@@ -1206,13 +1182,6 @@ impl Renderer {
 			panic!("TexCoord length doesn't match vertex length");
 		}
 
-		let uniform = TransformUniform {
-			mat4: [	1.0, 0.0, 0.0, 0.0,
-				0.0, 1.0, 0.0, 0.0,
-				0.0, 0.0, 1.0, 0.0,
-				0.0, 0.0, 0.0, 1.0],
-		};
-
 		// Add an instance
 		let instance = unsafe {
 			asi_vulkan::vw_instance_new(
@@ -1228,18 +1197,19 @@ impl Renderer {
 						self.style_nacomplex
 					}
 				},
-				mem::size_of::<TransformUniform>(),
-				&self.camera_buffer,
-				mem::size_of::<TransformUniform>(),
+				TransformUniform {
+					mat4: [	1.0, 0.0, 0.0, 0.0,
+						0.0, 1.0, 0.0, 0.0,
+						0.0, 0.0, 1.0, 0.0,
+						0.0, 0.0, 0.0, 1.0],
+				},
+				&self.camera_memory,
+				&self.effect_memory,
 				texture.view,
 				texture.sampler,
 				true, // 1 texure
 			)
 		};
-
-		vulkan::copy_memory(&self.connection, self.vw.device,
-			instance.uniform_memory, &uniform,
-			mem::size_of::<TransformUniform>());
 
 		let shape = Shape {
 			instance,
@@ -1304,15 +1274,19 @@ impl Renderer {
 		}
 	}
 
-	pub fn camera(&self, transform: &::Transform) {
-		let uniform = TransformUniform {
-			mat4: ::Transform(transform.0)
-				.matrix(self.projection.0).0,
-		};
+	pub fn camera(&mut self, transform: &::Transform) {
+		self.camera_memory.data.mat4 = ::Transform(transform.0)
+			.matrix(self.projection.0).0;
 
-		vulkan::copy_memory(&self.connection, self.vw.device,
-			self.camera_memory.memory, &uniform,
-			mem::size_of::<TransformUniform>());
+		self.camera_memory.update(&self.connection);
+	}
+
+	pub fn fog(&mut self, color: ::math::Vec4<f32>, min: f32, max: f32) -> ()
+	{
+		self.effect_memory.data.fogc = [color.x, color.y, color.z, color.w];
+		self.effect_memory.data.fogr = [min, max];
+
+		self.effect_memory.update(&self.connection);
 	}
 }
 

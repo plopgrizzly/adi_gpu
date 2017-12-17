@@ -19,7 +19,7 @@ extern crate afi;
 #[derive(Clone, Copy, PartialEq)]
 pub struct Transform(pub [f32; 16]);
 
-mod renderer;
+pub(crate) mod renderer;
 mod render_ops;
 mod asi_vulkan;
 mod math;
@@ -47,11 +47,8 @@ impl Display {
 		-> Display
 	{
 		let window = awi::Window::new(name, icon);
-		let renderer = renderer::Renderer::new(name,
+		let mut renderer = renderer::Renderer::new(name,
 			window.get_connection(), bg_color);
-
-//		renderer.init_camera();
-		renderer.camera(&Transform::new());
 
 		Display { window, renderer, xyz: (0.0, 0.0, 0.0),
 			rotate_xyz: (0.0, 0.0, 0.0) }

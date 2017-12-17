@@ -4,6 +4,8 @@
 //
 // src/renderer/ffi/vulkan/mod.rs
 
+use std::mem;
+
 use ami::*;
 
 pub mod vulkan;
@@ -46,11 +48,14 @@ fn check_error(name: &str, error: VkResult) {
 fn check_error(_: &str, _: VkResult) { }
 
 pub fn copy_memory<T>(connection: &asi_vulkan::Connection, vk_device: VkDevice,
-	vk_memory: VkDeviceMemory, data: *const T, size: usize)
+	vk_memory: VkDeviceMemory, data: *const T, size: usize) where T: Clone
 {
-	let mapped = unsafe {
-		asi_vulkan::map_memory(connection, vk_device, vk_memory, !0)
-	};
+	let mut mapped: *mut T = unsafe { mem::uninitialized() };
+
+	unsafe {
+		(connection.mapmem)(vk_device, vk_memory, 0, !0, 0,
+			&mut mapped as *mut *mut _ as *mut *mut Void).unwrap();
+	}
 
 	if mapped.is_null() {
 		panic!("Couldn't Map Buffer Memory?  Unknown cause.");
@@ -73,7 +78,7 @@ pub fn copy_memory<T>(connection: &asi_vulkan::Connection, vk_device: VkDevice,
 
 pub fn copy_memory_pitched<T>(connection: &asi_vulkan::Connection,
 	vk_device: VkDevice, vk_memory: VkDeviceMemory, data: &[T],
-	width: isize, height: isize, pitch: isize)
+	width: isize, height: isize, pitch: isize) where T: Clone
 {
 	let mapped : *mut T = unsafe {
 		asi_vulkan::map_memory(connection, vk_device, vk_memory, !0)

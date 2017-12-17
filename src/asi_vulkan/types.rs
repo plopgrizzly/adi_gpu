@@ -1322,7 +1322,7 @@ impl fmt::Display for VkResult {
 }
 
 impl VkResult {
-	/// Panic with error if not `VkResult::Success`.
+	/// Panic with error if not `VkResult::Success` or `VkResult::Incomplete`.
 	pub fn unwrap(self) -> () {
 		if self != VkResult::Success && self != VkResult::Incomplete {
 			panic!("Failed: {}", self);
