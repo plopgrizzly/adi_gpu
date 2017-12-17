@@ -130,6 +130,13 @@ impl<T> Vec3<T> where T: Copy + Clone {
 	pub(crate) fn max_p(self) -> T where T: cmp::Ord {
 		self.x.max(self.y).max(self.z)
 	}
+
+	/// Get the magnitude of a Vec3
+	pub fn mag(self) -> f32 where Self: Into<Vec3<f32>> {
+		let point: Vec3<f32> = self.into();
+
+		(point.x).hypot(point.y).hypot(point.z) as f32
+	}
 }
 
 impl Vec3<f32> {
@@ -171,11 +178,6 @@ impl Vec3<f32> {
 	/// Calculate the dot product of two `Vec3`s
 	pub fn dot(&self, other: Vec3<f32>) -> f32 {
 		self.x * other.x + self.y * other.y + self.z * other.z
-	}
-
-	/// Get the magnitude of a Vec3
-	pub fn mag(self) -> f32 {
-		(self.x as f64).hypot(self.y as f64).hypot(self.z as f64) as f32
 	}
 
 	/// Normalize a Vec3

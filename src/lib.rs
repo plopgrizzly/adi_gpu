@@ -42,13 +42,15 @@ pub struct Display {
 
 impl Display {
 	/// Connect to the display as a window with a name and icon.  Icon is in
-	/// aci image format: `[ width, height, bgra pixels ]`.
-	pub fn new(name: &str, icon: afi::Graphic, bg_color: (f32, f32, f32))
+	/// aci image format: `[ width, height, bgra pixels ]`.  `fog` is a
+	/// tuple: (distance, depth).
+	pub fn new(name: &str, icon: afi::Graphic, bg_color: (f32, f32, f32),
+		fog: (f32, f32))
 		-> Display
 	{
 		let window = awi::Window::new(name, icon);
-		let mut renderer = renderer::Renderer::new(name,
-			window.get_connection(), bg_color);
+		let renderer = renderer::Renderer::new(name,
+			window.get_connection(), bg_color, fog);
 
 		Display { window, renderer, xyz: (0.0, 0.0, 0.0),
 			rotate_xyz: (0.0, 0.0, 0.0) }
@@ -307,12 +309,18 @@ impl ::std::ops::Mul<math::Frustum> for Transform {
 
 	fn mul(self, rhs: math::Frustum) -> Self::Output {
 		math::Frustum {
-			near: self * rhs.near,
-			far: self * rhs.far,
-			top: self * rhs.top,
-			bottom: self * rhs.bottom,
-			right: self * rhs.right,
-			left: self * rhs.left,
+			center: self * rhs.center,
+			radius: rhs.radius,
+			wfov: rhs.wfov,
+			hfov: rhs.hfov,
+			xrot: rhs.xrot, // TODO
+			yrot: rhs.yrot, // TODO
+//			near: self * rhs.near,
+//			far: self * rhs.far,
+//			top: self * rhs.top,
+//			bottom: self * rhs.bottom,
+//			right: self * rhs.right,
+//			left: self * rhs.left,
 		}
 	}
 }

@@ -8,33 +8,37 @@ use std::fmt;
 
 use math::Vec3;
 use math::BBox;
-use math::Plane;
+// use math::Plane;
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct Frustum {
-	pub near: Plane,
-	pub far: Plane,
-	pub top: Plane,
-	pub bottom: Plane,
-	pub right: Plane,
-	pub left: Plane,
+	pub center: Vec3<f32>,
+	pub radius: f32,
+	pub wfov: f32,
+	pub hfov: f32,
+	pub xrot: f32,
+	pub yrot: f32,
 }
 
 impl fmt::Debug for Frustum {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "(near: {:?})", self.near)
+		write!(f, "(radius: {:?})", self.radius)
 	}
 }
 
 impl Frustum {
 	/// Create a new viewing frustum.
 	///
-	/// * `far` - The far clipping pane.
-	/// * `ar` - The aspect ratio (w:h).
+	/// * `center` - The center of the frustum cone.
+	/// * `radius` - How far can you see?
+	/// * `xrot` - Direction facing on x axis (radians).
+	/// * `yrot` - Direction facing on y axis (radians).
 	/// * `wfov` - The fov on the X axis (radians).
 	/// * `hfov` - The fov on the Y axis (radians).
-	pub fn new(far: f32, _ar: f32, wfov: f32, hfov: f32) -> Frustum {
-		let xmax = far / (wfov / 2.0).tan();
+	pub fn new(center: Vec3<f32>, radius: f32, xrot: f32, yrot: f32,
+		wfov: f32, hfov: f32) -> Frustum
+	{
+/*		let xmax = far / (wfov / 2.0).tan();
 		let ymax = far / (hfov / 2.0).tan();
 
 		let rightfar = Vec3::new(xmax, 0.0, far);
@@ -53,17 +57,29 @@ impl Frustum {
 		let near = Plane::new(Vec3::new(0.0, 0.0, 1.0), 0.0);
 		let far = Plane::new(Vec3::new(0.0, 0.0, -1.0), -far);
 
-		Frustum { near, far, top, bottom, right, left }
+		Frustum { near, far, top, bottom, right, left }*/
+
+		Frustum { center, radius, xrot, yrot, wfov, hfov }
 	}
 
 	/// If viewing frustum collides with the bounding box.
 	pub fn collide_bbox(&self, bbox: BBox<i32>) -> bool {
-		let top = self.top;
+		for i in bbox.all_points().iter() {
+			let point : Vec3<f32> = (*i).into();
+
+			if (point - self.center).mag() <= self.radius {
+				return true;
+			}
+		}
+
+		false
+
+/*		let top = self.top;
 		let bottom = self.bottom;
 		let right = self.right;
 		let left = self.left;
 		let near = self.near;
-		let far = self.far;
+		let far = self.far;*/
 
 /*		let planes = [self.top, self.bottom, self.right, self.left,
 			self.near, self.far];
@@ -76,19 +92,21 @@ impl Frustum {
 			}
 		}*/
 
-		// All 6 planes must have a point within their area.
+/*		// All 6 planes must have a point within their area.
 		top.isdistpos_bbox(bbox) && bottom.isdistpos_bbox(bbox) &&
 			right.isdistpos_bbox(bbox) && left.isdistpos_bbox(bbox)
-			&& near.isdistpos_bbox(bbox) && far.isdistpos_bbox(bbox)
+			&& near.isdistpos_bbox(bbox) && far.isdistpos_bbox(bbox)*/
 	}
 
 	/// If viewing frustum collides with a point.
 	pub fn collide_point(&self, point: Vec3<f32>) -> bool {
-		self.near.isdistpos_point(point)
+		(point - self.center).mag() <= self.radius
+
+/*		self.near.isdistpos_point(point)
 			&& self.far.isdistpos_point(point)
 			&& self.left.isdistpos_point(point)
 			&& self.right.isdistpos_point(point)
 			&& self.top.isdistpos_point(point)
-			&& self.bottom.isdistpos_point(point)
+			&& self.bottom.isdistpos_point(point)*/
 	}
 }

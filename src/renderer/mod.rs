@@ -43,8 +43,8 @@ pub enum ShapeHandle {
 	Opaque(u32),
 }
 
+// TODO: no gcc dependency.
 #[repr(C)]
-// #[derive(Copy, Clone)] // TODO: don't copy this.
 pub struct Vw {
 	pub instance: VkInstance, // Vulkan instance
 	surface: VkSurfaceKHR, // Surface that we render to.
@@ -518,7 +518,7 @@ pub struct Renderer {
 
 impl Renderer {
 	pub fn new(window_name: &str, window_connection: WindowConnection,
-		clear_color: (f32, f32, f32))
+		clear_color: (f32, f32, f32), fog: (f32, f32))
 		-> Renderer
 	{
 		let (connection, vw) = Vw::new(window_name, window_connection);
@@ -650,7 +650,7 @@ impl Renderer {
 		let (camera_memory, effect_memory) = unsafe {
 			asi_vulkan::vw_camera_new(&connection,vw.device,vw.gpu,
 				(clear_color.0, clear_color.1, clear_color.2,
-					1.0), (5.0, 2.5))
+					1.0), (fog.0, fog.1))
 		};
 
 		Renderer {
@@ -674,8 +674,11 @@ impl Renderer {
 			style_tinted, style_natinted, style_btinted,
 			style_complex, style_nacomplex, style_bcomplex,
 			clear_color,
-			frustum: ::math::Frustum::new(10.0, ar, 90.0,
-				2.0 * ((45.0 * ::std::f32::consts::PI / 180.0).tan() / ar).atan()), // TODO: FAR CLIP PLANE
+			frustum: ::math::Frustum::new(
+				::math::Vec3::new(0.0, 0.0, 0.0),
+				fog.0 + fog.1, 90.0,
+				2.0 * ((45.0 * ::std::f32::consts::PI / 180.0).tan() / ar).atan(),
+				0.0, 0.0), // TODO: FAR CLIP PLANE
 		}
 	}
 
@@ -740,9 +743,12 @@ impl Renderer {
 		self.vw.width = size.0;
 		self.vw.height = size.1;
 		self.ar = size.0 as f32 / size.1 as f32;
-		self.frustum = ::math::Frustum::new(10.0, self.ar,
+		self.frustum = ::math::Frustum::new(
+			self.frustum.center,
+			self.frustum.radius,
 			90.0, 2.0 * ((45.0 * ::std::f32::consts::PI / 180.0)
-				.tan() / self.ar).atan());
+				.tan() / self.ar).atan(),
+			self.frustum.xrot, self.frustum.yrot);
 
 		swapchain_delete(&self.connection, &mut self.vw);
 		swapchain_resize(&self.connection, &mut self.vw);
