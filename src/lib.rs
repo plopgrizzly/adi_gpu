@@ -94,10 +94,9 @@ pub struct TexCoords(usize);
 impl Texture {
 	/// Create a new texture.
 	pub fn new(display: &mut Display, image_data: afi::Graphic) -> Texture {
-		let image_data = image_data.as_slice();
+		let (w, h, pixels) = image_data.as_slice();
 
-		display.renderer.texture(image_data[0], image_data[1],
-			&image_data[2..])
+		display.renderer.texture(w, h, pixels)
 	}
 }
 
@@ -148,55 +147,56 @@ impl ShapeBuilder {
 
 	/// Push a shape with a solid color
 	#[inline(always)]
-	pub fn push_solid(&self, display: &mut Display, color: [f32; 4],
-		blending: bool, fancy: bool) -> Shape
+	pub fn push_solid(&self, display: &mut Display, transform: Transform,
+		color: [f32; 4], blending: bool, fancy: bool) -> Shape
 	{
-		Shape(display.renderer.solid(self.vertices, color, blending,
-			fancy))
+		Shape(display.renderer.solid(self.vertices, transform.0, color,
+			blending, fancy))
 	}
 
 	/// Push a shape with shaded by a gradient (1 color per vertex)
 	#[inline(always)]
-	pub fn push_gradient(&self, display: &mut Display, colors: Gradient,
-		blending: bool, fancy: bool)
-		-> Shape
+	pub fn push_gradient(&self, display: &mut Display, transform: Transform,
+		colors: Gradient, blending: bool, fancy: bool) -> Shape
 	{
-		Shape(display.renderer.gradient(self.vertices, colors.0,
-			blending, fancy))
+		Shape(display.renderer.gradient(self.vertices, transform.0,
+			colors.0, blending, fancy))
 	}
 
 	/// Push a shape with a texture and texture coordinates
 	///
 	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`
 	#[inline(always)]
-	pub fn push_texture(&self, display: &mut Display, texture: Texture,
-		tc: TexCoords, blending: bool, fancy: bool) -> Shape
+	pub fn push_texture(&self, display: &mut Display, transform: Transform,
+		texture: Texture, tc: TexCoords, blending: bool, fancy: bool)
+		-> Shape
 	{
-		Shape(display.renderer.textured(self.vertices, texture, tc.0,
-			blending, fancy))
+		Shape(display.renderer.textured(self.vertices, transform.0,
+			texture, tc.0, blending, fancy))
 	}
 
 	/// Push a shape with a texture, texture coordinates and alpha
 	///
 	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`
 	#[inline(always)]
-	pub fn push_faded(&self, display: &mut Display, texture: Texture,
-		tc: TexCoords, alpha: f32, fancy: bool) -> Shape
+	pub fn push_faded(&self, display: &mut Display, transform: Transform,
+		texture: Texture, tc: TexCoords, alpha: f32, fancy: bool)
+		-> Shape
 	{
-		Shape(display.renderer.faded(self.vertices, texture, tc.0,
-			alpha, fancy))
+		Shape(display.renderer.faded(self.vertices, transform.0,
+			texture, tc.0, alpha, fancy))
 	}
 
 	/// Push a shape with a texture and texture coordinates and tint
 	///
 	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`
 	#[inline(always)]
-	pub fn push_tinted(&self, display: &mut Display, texture: Texture,
-		tc: TexCoords, tint: [f32; 4], blending: bool, fancy: bool)
-		-> Shape
+	pub fn push_tinted(&self, display: &mut Display, transform: Transform,
+		texture: Texture, tc: TexCoords, tint: [f32; 4], blending: bool,
+		fancy: bool) -> Shape
 	{
-		Shape(display.renderer.tinted(self.vertices, texture, tc.0,
-			tint, blending, fancy))
+		Shape(display.renderer.tinted(self.vertices, transform.0,
+			texture, tc.0, tint, blending, fancy))
 	}
 
 	/// Push a shape with a texture and texture coordinates and tint per
@@ -204,12 +204,12 @@ impl ShapeBuilder {
 	///
 	/// Texture Coordinates follow this format `(X, Y, UNUSED(1.0), ALPHA)`
 	#[inline(always)]
-	pub fn push_complex(&self, display: &mut Display, texture: Texture,
-		tc: TexCoords, tints: Gradient, blending: bool, fancy: bool)
-		-> Shape
+	pub fn push_complex(&self, display: &mut Display, transform: Transform,
+		texture: Texture, tc: TexCoords, tints: Gradient,
+		blending: bool, fancy: bool) -> Shape
 	{
-		Shape(display.renderer.complex(self.vertices, texture, tc.0,
-			tints.0, blending, fancy))
+		Shape(display.renderer.complex(self.vertices, transform.0,
+			texture, tc.0, tints.0, blending, fancy))
 	}
 }
 

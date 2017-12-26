@@ -892,8 +892,9 @@ impl Renderer {
 		a
 	}
 
-	pub fn textured(&mut self, model: usize, texture: Texture,
-		texcoords: usize, alpha: bool, blend: bool) -> ShapeHandle
+	pub fn textured(&mut self, model: usize, mat4: [f32; 16],
+		texture: Texture, texcoords: usize, alpha: bool, blend: bool)
+		-> ShapeHandle
 	{
 		if self.models[model].vertex_count
 			!= self.texcoords[texcoords].vertex_count
@@ -916,12 +917,7 @@ impl Renderer {
 						self.style_natexture
 					}
 				},
-				TransformUniform {
-					mat4: [	1.0, 0.0, 0.0, 0.0,
-						0.0, 1.0, 0.0, 0.0,
-						0.0, 0.0, 1.0, 0.0,
-						0.0, 0.0, 0.0, 1.0],
-				},
+				TransformUniform { mat4 },
 				&self.camera_memory, // TODO: at shader creation, not shape creation
 				&self.effect_memory,
 				texture.view,
@@ -942,7 +938,7 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
-			position: self.models[model].center,
+			position: ::Transform(mat4) * self.models[model].center,
 		};
 
 		if alpha {
@@ -952,9 +948,8 @@ impl Renderer {
 		}
 	}
 
-	pub fn solid(&mut self, model: usize, color: [f32; 4], alpha: bool,
-		blend: bool)
-		-> ShapeHandle
+	pub fn solid(&mut self, model: usize, mat4: [f32; 16], color: [f32; 4],
+		alpha: bool, blend: bool) -> ShapeHandle
 	{
 		// Add an instance
 		let instance = unsafe {
@@ -973,10 +968,7 @@ impl Renderer {
 				},
 				TransformAndColorUniform {
 					vec4: color,
-					mat4: [	1.0, 0.0, 0.0, 0.0,
-						0.0, 1.0, 0.0, 0.0,
-						0.0, 0.0, 1.0, 0.0,
-						0.0, 0.0, 0.0, 1.0 ],
+					mat4,
 				},
 				&self.camera_memory,
 				&self.effect_memory,
@@ -998,7 +990,7 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
-			position: self.models[model].center,
+			position: ::Transform(mat4) * self.models[model].center,
 		};
 
 		if alpha {
@@ -1008,9 +1000,8 @@ impl Renderer {
 		}
 	}
 
-	pub fn gradient(&mut self, model: usize, colors: usize, alpha: bool,
-		blend: bool)
-		-> ShapeHandle
+	pub fn gradient(&mut self, model: usize, mat4: [f32; 16], colors: usize,
+		alpha: bool, blend: bool) -> ShapeHandle
 	{
 		if self.models[model].vertex_count
 			!= self.gradients[colors].vertex_count
@@ -1033,12 +1024,7 @@ impl Renderer {
 						self.style_nagradient
 					}
 				},
-				TransformUniform {
-					mat4: [	1.0, 0.0, 0.0, 0.0,
-						0.0, 1.0, 0.0, 0.0,
-						0.0, 0.0, 1.0, 0.0,
-						0.0, 0.0, 0.0, 1.0],
-				},
+				TransformUniform { mat4 },
 				&self.camera_memory,
 				&self.effect_memory,
 				mem::zeroed(),
@@ -1059,7 +1045,7 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
-			position: self.models[model].center,
+			position: ::Transform(mat4) * self.models[model].center,
 		};
 
 		if alpha {
@@ -1069,7 +1055,7 @@ impl Renderer {
 		}
 	}
 
-	pub fn faded(&mut self, model: usize, texture: Texture,
+	pub fn faded(&mut self, model: usize, mat4: [f32; 16], texture: Texture,
 		texcoords: usize, fade_factor: f32, blend: bool) -> ShapeHandle
 	{
 		if self.models[model].vertex_count
@@ -1090,10 +1076,7 @@ impl Renderer {
 					self.style_faded
 				},
 				TransformAndFadeUniform {
-					mat4: [	1.0, 0.0, 0.0, 0.0,
-						0.0, 1.0, 0.0, 0.0,
-						0.0, 0.0, 1.0, 0.0,
-						0.0, 0.0, 0.0, 1.0],
+					mat4,
 					fade: fade_factor,
 				},
 				&self.camera_memory,
@@ -1116,15 +1099,15 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
-			position: self.models[model].center,
+			position: ::Transform(mat4) * self.models[model].center,
 		};
 
 		ShapeHandle::Alpha(self.alpha_octree.add(shape))
 	}
 
-	pub fn tinted(&mut self, model: usize, texture: Texture,
-		texcoords: usize, color: [f32; 4], alpha: bool, blend: bool)
-		-> ShapeHandle
+	pub fn tinted(&mut self, model: usize, mat4: [f32; 16],
+		texture: Texture, texcoords: usize, color: [f32; 4],
+		alpha: bool, blend: bool) -> ShapeHandle
 	{
 		if self.models[model].vertex_count
 			!= self.texcoords[texcoords].vertex_count
@@ -1148,10 +1131,7 @@ impl Renderer {
 					}
 				},
 				TransformAndColorUniform {
-					mat4: [	1.0, 0.0, 0.0, 0.0,
-						0.0, 1.0, 0.0, 0.0,
-						0.0, 0.0, 1.0, 0.0,
-						0.0, 0.0, 0.0, 1.0],
+					mat4,
 					vec4: color,
 				},
 				&self.camera_memory,
@@ -1174,7 +1154,7 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
-			position: self.models[model].center,
+			position: ::Transform(mat4) * self.models[model].center,
 		};
 
 		if alpha {
@@ -1184,9 +1164,9 @@ impl Renderer {
 		}
 	}
 
-	pub fn complex(&mut self, model: usize, texture: Texture,
-		texcoords: usize, colors: usize, alpha: bool, blend: bool)
-		-> ShapeHandle
+	pub fn complex(&mut self, model: usize, mat4: [f32; 16],
+		texture: Texture, texcoords: usize, colors: usize, alpha: bool,
+		blend: bool) -> ShapeHandle
 	{
 		if self.models[model].vertex_count
 			!= self.texcoords[texcoords].vertex_count ||
@@ -1211,12 +1191,7 @@ impl Renderer {
 						self.style_nacomplex
 					}
 				},
-				TransformUniform {
-					mat4: [	1.0, 0.0, 0.0, 0.0,
-						0.0, 1.0, 0.0, 0.0,
-						0.0, 0.0, 1.0, 0.0,
-						0.0, 0.0, 0.0, 1.0],
-				},
+				TransformUniform { mat4 },
 				&self.camera_memory,
 				&self.effect_memory,
 				texture.view,
@@ -1237,7 +1212,7 @@ impl Renderer {
 			offset: self.models[model].offset,
 			bounds: self.models[model].bounds,
 			center: self.models[model].center,
-			position: self.models[model].center,
+			position: ::Transform(mat4) * self.models[model].center,
 		};
 
 		if alpha {
