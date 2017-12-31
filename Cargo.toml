@@ -49,6 +49,7 @@ build = "build.rs"
 afi = "^0.3"
 ami = "^0.5"
 awi = { path = "../awi" }
+asi_vulkan = { path = "../asi_vulkan" }
 
 [build-dependencies.gcc]
 version = "0.3.50"

@@ -13,6 +13,7 @@
 extern crate ami;
 extern crate awi;
 extern crate afi;
+extern crate asi_vulkan;
 
 /// Transform represents a transformation matrix.
 #[must_use]
@@ -21,7 +22,6 @@ pub struct Transform(pub [f32; 16]);
 
 pub(crate) mod renderer;
 mod render_ops;
-mod asi_vulkan;
 mod math;
 
 pub mod input {
@@ -63,7 +63,7 @@ impl Display {
 		let input = self.window.input();
 
 		if input == Some(input::Input::Resize) {
-			self.renderer.resize(self.window.get_dimensions());
+			self.renderer.resize(self.window.wh());
 		}
 
 		input
@@ -79,6 +79,11 @@ impl Display {
 	pub fn camera(&mut self, xyz: (f32,f32,f32), rotate_xyz: (f32,f32,f32)) {
 		self.renderer.set_camera(xyz, rotate_xyz);
 		self.renderer.camera();
+	}
+
+	/// Get the width and height
+	pub fn wh(&self) -> (u32, u32) {
+		self.window.wh()
 	}
 }
 
@@ -97,6 +102,29 @@ impl Texture {
 		let (w, h, pixels) = image_data.as_slice();
 
 		display.renderer.texture(w, h, pixels)
+	}
+
+	/// Create an empty texture.
+	pub fn empty(display: &mut Display, width: u32, height: u32)
+		-> Texture
+	{
+		display.renderer.texture(width, height,
+			vec![0; (width*height) as usize].as_slice())
+	}
+
+	/// Set the pixels for the texture.
+	pub fn set(&mut self, display: &mut Display, data: &[u32]) -> () {
+		display.renderer.set_texture(self, data);
+	}
+
+	/// Get the width
+	pub fn w(&self) -> u32 {
+		self.w
+	}
+
+	/// Get the height
+	pub fn h(&self) -> u32 {
+		self.h
 	}
 }
 

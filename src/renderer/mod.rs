@@ -19,6 +19,12 @@ use asi_vulkan;
 use asi_vulkan::types::*;
 use asi_vulkan::Connection;
 
+// TODO
+use asi_vulkan::TransformUniform;
+use asi_vulkan::FogUniform;
+use asi_vulkan::Style;
+use asi_vulkan::VwInstance;
+
 #[derive(Clone)] #[repr(C)] struct TransformAndFadeUniform {
 	mat4: [f32; 16],
 	fade: f32,
@@ -27,15 +33,6 @@ use asi_vulkan::Connection;
 #[derive(Clone)] #[repr(C)] struct TransformAndColorUniform {
 	mat4: [f32; 16],
 	vec4: [f32; 4],
-}
-
-#[derive(Clone)] #[repr(C)] pub(crate) struct TransformUniform {
-	pub mat4: [f32; 16],
-}
-
-#[derive(Clone)] #[repr(C)] pub(crate) struct FogUniform {
-	pub fogc: [f32; 4],
-	pub fogr: [f32; 2],
 }
 
 pub enum ShapeHandle {
@@ -75,14 +72,6 @@ pub struct Vw {
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub struct Style {
-	pub pipeline: VkPipeline,
-	pub descsetlayout: VkDescriptorSetLayout,
-	pub pipeline_layout: VkPipelineLayout,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
 pub struct Texture {
 	mappable_image: VkImage,
 	mappable_memory: VkDeviceMemory,
@@ -90,8 +79,8 @@ pub struct Texture {
 	memory: VkDeviceMemory,
 	sampler: VkSampler,
 	view: VkImageView,
-	w: u32,
-	h: u32,
+	pub(super) w: u32,
+	pub(super) h: u32,
 	pitch: u32,
 	staged: bool,
 }
@@ -184,15 +173,6 @@ impl Shape {
 	}*/
 }
 
-#[derive(Copy, Clone)]
-pub struct VwInstance {
-	pub matrix_buffer: VkBuffer,
-	pub uniform_memory: VkDeviceMemory,
-	pub desc_set: VkDescriptorSet,
-	pub desc_pool: VkDescriptorPool,
-	pub pipeline: Style,
-}
-
 extern {
 	fn vw_vulkan_draw_begin(v: *mut Vw, r: f32, g: f32, b: f32) -> ();
 // TODO: In Rust
@@ -229,7 +209,7 @@ fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 		);
 
 		// Link Depth Buffer to swapchain
-		let (img, view, mem) = asi_vulkan::create_depth_buffer(
+		let (img, view) = asi_vulkan::create_depth_buffer(
 			connection,
 			vw.device,
 			vw.gpu,
@@ -240,9 +220,9 @@ fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 			vw.height,
 		);
 
-		vw.depth_image = img;
+		vw.depth_image = img.image;
 		vw.depth_image_view = view;
-		vw.depth_image_memory = mem;
+		vw.depth_image_memory = img.image_memory;
 
 		// Link Render Pass to swapchain
 		vw.render_pass = asi_vulkan::create_render_pass(
@@ -289,34 +269,34 @@ fn new_texture(connection: &Connection, vw: &mut Vw, width: u32, height: u32)
 //	let mut format_props = unsafe { mem::uninitialized() };
 	let staged = !vw.sampled;
 
-	let (mappable_image, mappable_memory) = unsafe {
-		asi_vulkan::create_image(
-			connection, vw.device, vw.gpu, width, height,
-			VkFormat::R8g8b8a8Srgb, VkImageTiling::Linear,
-			if staged { VkImageUsage::TransferSrcBit }
-				else { VkImageUsage::SampledBit },
-			VkImageLayout::Preinitialized,
-			0x00000006 /* visible|coherent */
-		)
-	};
+	let mappable_image = asi_vulkan::Image::new(connection, vw.device,
+		vw.gpu, width, height, VkFormat::R8g8b8a8Srgb,
+		VkImageTiling::Linear,
+		if staged { VkImageUsage::TransferSrcBit }
+		else { VkImageUsage::SampledBit },
+		VkImageLayout::Preinitialized,
+		0x00000006 /* visible|coherent */
+	);
 
 	let layout = unsafe {
 		asi_vulkan::subres_layout(connection, vw.device,
-			mappable_image)
+			mappable_image.image)
 	};
 
 	let pitch = layout.row_pitch;
 
-	let (image, memory) = if staged {
-		unsafe {
-			asi_vulkan::create_image(
-				connection, vw.device, vw.gpu, width, height,
-				VkFormat::R8g8b8a8Srgb, VkImageTiling::Optimal,
-				VkImageUsage::TransferDstAndUsage,
-				VkImageLayout::Undefined, 0)
-		}
+	let (image, image_memory) = if staged {
+		let i = asi_vulkan::Image::new(connection, vw.device, vw.gpu,
+			width, height, VkFormat::R8g8b8a8Srgb,
+			VkImageTiling::Optimal,
+			VkImageUsage::TransferDstAndUsage,
+			VkImageLayout::Undefined, 0);
+
+		(i.image, i.image_memory)
 	} else {
-		(mappable_image, mappable_memory)
+		let i = &mappable_image;
+
+		(i.image, i.image_memory)
 	};
 //
 	let sampler = unsafe { asi_vulkan::new_sampler(connection, vw.device) };
@@ -327,7 +307,9 @@ fn new_texture(connection: &Connection, vw: &mut Vw, width: u32, height: u32)
 	};
 //
 	Texture {
-		staged, mappable_image, mappable_memory, image, memory, view,
+		staged, mappable_image: mappable_image.image,
+		mappable_memory: mappable_image.image_memory,
+		image: image, memory: image_memory, view,
 		pitch: pitch as u32, sampler, w: width, h: height,
 	}
 }
@@ -773,6 +755,10 @@ impl Renderer {
 		set_texture(&self.connection, &mut self.vw, &mut texture, rgba);
 
 		texture
+	}
+
+	pub fn set_texture(&mut self, texture: &mut Texture, rgba: &[u32]) {
+		set_texture(&self.connection, &mut self.vw, texture, rgba);
 	}
 
 	/// Push a model (collection of vertices) into graphics memory.
