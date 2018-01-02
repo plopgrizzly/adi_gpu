@@ -75,16 +75,16 @@ pub fn create_surface_xcb(instance: VkInstance, connection: *mut Void,
 }
 
 #[cfg(target_os = "windows")]
-pub fn create_surface(instance: VkInstance, native_window: &::AwiWindow)
-	-> VkSurfaceKHR
+pub fn create_surface_windows(instance: VkInstance, connection: *mut Void,
+	window: *mut Void) -> VkSurfaceKHR
 {
 	let mut surface = unsafe { mem::uninitialized() };
 	let surface_create_info = SurfaceCreateInfo {
 		s_type: VkStructureType::SurfaceCreateInfo,
-		p_next: null!(),
+		p_next: null_mut!(),
 		flags: 0,
-		hinstance: native_window.get_connection(),
-		hwnd: native_window.get_window(),
+		hinstance: connection,
+		hwnd: window,
 	};
 
 	unsafe {
@@ -96,7 +96,7 @@ pub fn create_surface(instance: VkInstance, native_window: &::AwiWindow)
 				surface: *mut VkSurfaceKHR) -> VkResult;
 		}
 		check_error(ERROR, vkCreateWin32SurfaceKHR(
-			instance, &surface_create_info, null!(), &mut surface
+			instance, &surface_create_info, null_mut!(), &mut surface
 		));
 	};
 
@@ -104,7 +104,7 @@ pub fn create_surface(instance: VkInstance, native_window: &::AwiWindow)
 }
 
 #[cfg(target_os = "android")]
-pub fn create_surface(instance: VkInstance, native_window: &::AwiWindow)
+pub fn create_surface_android(instance: VkInstance, window: *mut ANativeWindow)
 	-> VkSurfaceKHR
 {
 	let mut surface = unsafe { mem::uninitialized() };
@@ -112,7 +112,7 @@ pub fn create_surface(instance: VkInstance, native_window: &::AwiWindow)
 		s_type: VkStructureType::SurfaceCreateInfo,
 		p_next: null!(),
 		flags: 0,
-		window: native_window.get_window(),
+		window: window,
 	};
 
 	unsafe {
@@ -123,7 +123,7 @@ pub fn create_surface(instance: VkInstance, native_window: &::AwiWindow)
 				surface: *mut VkSurfaceKHR) -> VkResult;
 		}
 		check_error(ERROR, vkCreateAndroidSurfaceKHR(
-			instance, &surface_create_info, null!(), &mut surface
+			instance, &surface_create_info, null_mut!(), &mut surface
 		));
 	};
 
@@ -134,12 +134,15 @@ pub fn create_surface(instance: VkInstance, connection: WindowConnection)
 	-> VkSurfaceKHR
 {
 	match connection {
+		#[cfg(any(target_os = "linux", target_os = "macos"))]
 		WindowConnection::Xcb(connection,window) => {
 			create_surface_xcb(instance, connection, window)
 		}
 		WindowConnection::Wayland => panic!("Wayland Rendering Not Supported Yet"),
 		WindowConnection::DirectFB => panic!("DirectFB Rendering Not Supported Yet"),
-		WindowConnection::Windows => panic!("Windows Rendering Not Supported Yet"),
+		WindowConnection::Windows(connection, window) => {
+			create_surface_windows(instance, connection, window)
+		}
 		WindowConnection::Android => panic!("Android Rendering Not Supported Yet"),
 		WindowConnection::IOS => panic!("IOS Rendering Not Supported Yet"),
 		WindowConnection::AldaronsOS => panic!("AldaronsOS Rendering Not Supported Yet"),

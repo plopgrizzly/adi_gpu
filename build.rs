@@ -22,6 +22,6 @@ fn link() {
 }
 
 fn main() {
-	gcc::Build::new().file("native/vw.c").flag("-Wall").flag("-Werror").compile("libaldaronvw.a");
+	gcc::Build::new().file("native/vw.c").flag("-Wall").compile("libaldaronvw.a");
 	link();
 }
