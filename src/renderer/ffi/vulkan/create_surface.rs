@@ -14,9 +14,8 @@ use awi::WindowConnection;
 use asi_vulkan::types::*;
 use super::check_error;
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
 #[repr(C)]
-struct SurfaceCreateInfo {
+struct SurfaceCreateInfoXcb {
 	s_type: VkStructureType,
 	p_next: *mut Void,
 	flags: u32,
@@ -24,9 +23,8 @@ struct SurfaceCreateInfo {
 	window: u32,
 }
 
-#[cfg(target_os = "windows")]
 #[repr(C)]
-struct SurfaceCreateInfo {
+struct SurfaceCreateInfoWindows {
 	s_type: VkStructureType,
 	p_next: *mut Void,
 	flags: u32,
@@ -35,24 +33,22 @@ struct SurfaceCreateInfo {
 	hwnd: *mut Void,
 }
 
-#[cfg(target_os = "android")]
 #[repr(C)]
-struct SurfaceCreateInfo {
+struct SurfaceCreateInfoAndroid {
 	s_type: VkStructureType,
 	p_next: *mut Void,
 	flags: u32,
-	window: *mut ANativeWindow,
+	window: *mut Void, // ANativeWindow,
 }
 
 const ERROR : &'static str = "Failed to create surface.";
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
 pub fn create_surface_xcb(instance: VkInstance, connection: *mut Void,
 	window: u32) -> VkSurfaceKHR
 {
 	let mut surface = unsafe { mem::uninitialized() };
-	let surface_create_info = SurfaceCreateInfo {
-		s_type: VkStructureType::SurfaceCreateInfo,
+	let surface_create_info = SurfaceCreateInfoXcb {
+		s_type: VkStructureType::SurfaceCreateInfoXcb,
 		p_next: null_mut!(),
 		flags: 0,
 		connection: connection,
@@ -63,7 +59,7 @@ pub fn create_surface_xcb(instance: VkInstance, connection: *mut Void,
 		extern "system" {
 			fn vkCreateXcbSurfaceKHR(
 				instance: VkInstance,
-				pCreateInfo: *const SurfaceCreateInfo,
+				pCreateInfo: *const SurfaceCreateInfoXcb,
 				pAllocator: *mut Void,
 				surface: *mut VkSurfaceKHR) -> VkResult;
 		}
@@ -74,13 +70,12 @@ pub fn create_surface_xcb(instance: VkInstance, connection: *mut Void,
 	surface
 }
 
-#[cfg(target_os = "windows")]
 pub fn create_surface_windows(instance: VkInstance, connection: *mut Void,
 	window: *mut Void) -> VkSurfaceKHR
 {
 	let mut surface = unsafe { mem::uninitialized() };
-	let surface_create_info = SurfaceCreateInfo {
-		s_type: VkStructureType::SurfaceCreateInfo,
+	let surface_create_info = SurfaceCreateInfoWindows {
+		s_type: VkStructureType::SurfaceCreateInfoWindows,
 		p_next: null_mut!(),
 		flags: 0,
 		hinstance: connection,
@@ -91,7 +86,7 @@ pub fn create_surface_windows(instance: VkInstance, connection: *mut Void,
 		extern "system" {
 			fn vkCreateWin32SurfaceKHR(
 				instance: VkInstance,
-				pCreateInfo: *const SurfaceCreateInfo,
+				pCreateInfo: *const SurfaceCreateInfoWindows,
 				pAllocator: *mut Void,
 				surface: *mut VkSurfaceKHR) -> VkResult;
 		}
@@ -103,14 +98,13 @@ pub fn create_surface_windows(instance: VkInstance, connection: *mut Void,
 	surface
 }
 
-#[cfg(target_os = "android")]
-pub fn create_surface_android(instance: VkInstance, window: *mut ANativeWindow)
+pub fn create_surface_android(instance: VkInstance, window: *mut Void)
 	-> VkSurfaceKHR
 {
 	let mut surface = unsafe { mem::uninitialized() };
-	let surface_create_info = SurfaceCreateInfo {
-		s_type: VkStructureType::SurfaceCreateInfo,
-		p_next: null!(),
+	let surface_create_info = SurfaceCreateInfoAndroid {
+		s_type: VkStructureType::SurfaceCreateInfoAndroid,
+		p_next: null_mut!(),
 		flags: 0,
 		window: window,
 	};
@@ -118,7 +112,7 @@ pub fn create_surface_android(instance: VkInstance, window: *mut ANativeWindow)
 	unsafe {
 		extern "system" {
 			fn vkCreateAndroidSurfaceKHR(instance: VkInstance,
-				pCreateInfo: *const SurfaceCreateInfo,
+				pCreateInfo: *const SurfaceCreateInfoAndroid,
 				pAllocator: *mut Void,
 				surface: *mut VkSurfaceKHR) -> VkResult;
 		}
@@ -134,7 +128,6 @@ pub fn create_surface(instance: VkInstance, connection: WindowConnection)
 	-> VkSurfaceKHR
 {
 	match connection {
-		#[cfg(any(target_os = "linux", target_os = "macos"))]
 		WindowConnection::Xcb(connection,window) => {
 			create_surface_xcb(instance, connection, window)
 		}
