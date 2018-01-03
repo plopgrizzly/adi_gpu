@@ -11,7 +11,7 @@ authors = ["Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>"]
 
 [dependencies]
 adi_gpu = { path = "../../" }
-aci_png = { path = "../../../aci_png" } # "^0.2"
+aci_png = "^0.5"
 
 # Enable checks & validation
 [features]

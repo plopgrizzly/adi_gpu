@@ -8,25 +8,22 @@ extern crate adi_gpu;
 extern crate aci_png;
 
 fn main() {
-	let display_icon = aci_png::decode(include_bytes!("../res/icon.png"))
-		.unwrap();
-
 	let mut display = adi_gpu::Display::new("Willow Minimal Example",
-		&display_icon);
-
-	let mut queue = adi_gpu::input::Queue::new();
+		aci_png::decode(include_bytes!("../res/icon.png")).unwrap(),
+		(0.25, 0.25, 1.0), (20.0, 10.0));
 
 	'app: loop {
-		display.update(&mut queue);
-
-		for input in queue.iter() {
+		// Go through this frame's input.
+		while let Some(input) = display.input() {
 			use adi_gpu::input::Input::*;
 			use adi_gpu::input::Msg::*;
 
-			match *input {
+			match input {
 				Msg(Quit) | Msg(Back) => break 'app,
 				_ => {},
 			}
 		}
+
+		display.update();
 	}
 }

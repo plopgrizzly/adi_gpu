@@ -70,6 +70,14 @@ pub fn create_surface_xcb(instance: VkInstance, connection: *mut Void,
 	surface
 }
 
+#[cfg(not(target_os = "windows"))]
+pub fn create_surface_windows(instance: VkInstance, connection: *mut Void,
+	window: *mut Void) -> VkSurfaceKHR
+{
+	panic!("Can't create Windows surface on not Windows.");
+}
+
+#[cfg(target_os = "windows")]
 pub fn create_surface_windows(instance: VkInstance, connection: *mut Void,
 	window: *mut Void) -> VkSurfaceKHR
 {
