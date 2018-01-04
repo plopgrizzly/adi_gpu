@@ -43,6 +43,14 @@ struct SurfaceCreateInfoAndroid {
 
 const ERROR : &'static str = "Failed to create surface.";
 
+#[cfg(not(unix))]
+pub fn create_surface_xcb(instance: VkInstance, connection: *mut Void,
+	window: u32) -> VkSurfaceKHR
+{
+	panic!("Can't create XCB surface on not Unix.");
+}
+
+#[cfg(unix)]
 pub fn create_surface_xcb(instance: VkInstance, connection: *mut Void,
 	window: u32) -> VkSurfaceKHR
 {
@@ -106,6 +114,14 @@ pub fn create_surface_windows(instance: VkInstance, connection: *mut Void,
 	surface
 }
 
+#[cfg(not(target_os = "android"))]
+pub fn create_surface_android(instance: VkInstance, window: *mut Void)
+	-> VkSurfaceKHR
+{
+	panic!("Can't create Android surface on not Android.");
+}
+
+#[cfg(target_os = "android")]
 pub fn create_surface_android(instance: VkInstance, window: *mut Void)
 	-> VkSurfaceKHR
 {

@@ -55,7 +55,7 @@ asi_vulkan = { path = "../asi_vulkan" }
 version = "0.3.50"
 
 [features]
-checks = []
-validation = []
+checks = ["asi_vulkan/checks"]
+validation = ["asi_vulkan/validation"]
 
 ################################################################################
