@@ -73,8 +73,11 @@ pub fn resize(display: &mut adi_gpu::Display, image_tex: adi_gpu::Texture,
 }
 
 fn main() {
-	let mut display = adi_gpu::Display::new("adi_gpu Animated Example",
-		aci_png::decode(include_bytes!("../res/test.png")).unwrap(),
+//	let mut display = adi_gpu::Display::new("adi_gpu Animated Example",
+//		aci_png::decode(include_bytes!("../res/test.png")).unwrap(),
+//		(0.25, 0.25, 1.0), (20.0, 10.0));
+	let mut display = adi_gpu::Display::new("Willow Minimal Example",
+		aci_png::decode(include_bytes!("../res/icon.png")).unwrap(),
 		(0.25, 0.25, 1.0), (20.0, 10.0));
 
 	let logo_texture = adi_gpu::Texture::new(&mut display,

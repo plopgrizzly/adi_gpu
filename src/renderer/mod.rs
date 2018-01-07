@@ -363,36 +363,28 @@ fn set_texture(connection: &Connection, vw: &mut Vw, texture: &mut Texture,
 
 impl Vw {
 	pub fn new(window_name: &str, window_connection: WindowConnection) -> (Connection, Vw) {
-		println!("Vulkan::new");
 		let connection = vulkan::vulkan::Vulkan::new(window_name).unwrap();
 
 		let instance = connection.0.vk;
-		println!("create_surface");
 		let surface = vulkan::create_surface::create_surface(	
 			instance, window_connection);
-		println!("get_gpu");
 		let (gpu, pqi, sampled) = unsafe {
 			asi_vulkan::get_gpu(&connection.0, instance, surface)
 		};
-		println!("create_device");
 		let device = unsafe {
 			asi_vulkan::create_device(&connection.0, gpu, pqi)
 		};
-		println!("create_queue");
 		let present_queue = unsafe {
 			asi_vulkan::create_queue(&connection.0, device, pqi)
 		};
-		println!("create_command_buffer");
 		let command_buffer = unsafe {
 			asi_vulkan::create_command_buffer(&connection.0,
 				device, pqi)
 		}.0;
-		println!("get_color_format");
 		let color_format = unsafe {
 			asi_vulkan::get_color_format(&connection.0,
 				gpu, surface)
 		};
-		println!("present_mode");
 		let image_count = unsafe {
 			asi_vulkan::get_buffering(&connection.0, gpu, surface)
 		};
@@ -400,7 +392,6 @@ impl Vw {
 			asi_vulkan::get_present_mode(&connection.0, gpu,
 				surface)
 		};
-		println!("VW");
 
 		let mut vw = Vw {
 			instance, surface,
@@ -513,9 +504,7 @@ impl Renderer {
 		clear_color: (f32, f32, f32), fog: (f32, f32))
 		-> Renderer
 	{
-		println!("Vw::new");
 		let (connection, vw) = Vw::new(window_name, window_connection);
-		println!("ShaderModule::new");
 		let solid_vert = asi_vulkan::ShaderModule::new(&connection,
 			vw.device, include_bytes!(
 			"../native_renderer/vulkan/res/solid-vert.spv"));
@@ -585,7 +574,6 @@ impl Renderer {
 		let complex_bfrag = asi_vulkan::ShaderModule::new(&connection,
 			vw.device, include_bytes!(
 			"../native_renderer/vulkan/res/gradient-bfrag.spv"));
-
 		let style_solid = asi_vulkan::new_pipeline(&connection,
 			vw.device, vw.render_pass, vw.width, vw.height,
 			&solid_vert, &solid_frag, 0, 1, true);

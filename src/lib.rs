@@ -47,10 +47,8 @@ impl Display {
 		-> Display
 	{
 		let window = awi::Window::new(name, icon);
-		println!("Initializing renderer....");
 		let renderer = renderer::Renderer::new(name,
 			window.get_connection(), bg_color, fog);
-		println!("Initialized renderer.");
 
 		Display { window, renderer }
 	}

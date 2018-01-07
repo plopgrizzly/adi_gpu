@@ -15,6 +15,6 @@ aci_png = "^0.5"
 
 # Enable checks & validation
 [features]
-default = []
+default = []#["checks", "validation"]
 checks = ["adi_gpu/checks"]
 validation = ["adi_gpu/validation"]
