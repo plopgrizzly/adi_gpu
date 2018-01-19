@@ -1,5 +1,5 @@
 // Aldaron's Device Interface / GPU
-// Copyright (c) 2017 Plop Grizzly, Jeron Lau <jeron.lau@plopgrizzly.com>
+// Copyright (c) 2017-2018 Jeron Lau <jeron.lau@plopgrizzly.com>
 // Licensed under the MIT LICENSE
 //
 // src/renderer/ffi/vulkan/create_surface.rs
@@ -14,7 +14,7 @@ use awi::WindowConnection;
 use asi_vulkan::types::*;
 use super::check_error;
 
-#[repr(C)]
+#[cfg(unix)] #[repr(C)]
 struct SurfaceCreateInfoXcb {
 	s_type: VkStructureType,
 	p_next: *mut Void,
@@ -23,7 +23,7 @@ struct SurfaceCreateInfoXcb {
 	window: u32,
 }
 
-#[repr(C)]
+#[cfg(target_os = "windows")] #[repr(C)]
 struct SurfaceCreateInfoWindows {
 	s_type: VkStructureType,
 	p_next: *mut Void,
@@ -33,7 +33,7 @@ struct SurfaceCreateInfoWindows {
 	hwnd: *mut Void,
 }
 
-#[repr(C)]
+#[cfg(target_os = "android")] #[repr(C)]
 struct SurfaceCreateInfoAndroid {
 	s_type: VkStructureType,
 	p_next: *mut Void,
@@ -44,9 +44,7 @@ struct SurfaceCreateInfoAndroid {
 const ERROR : &'static str = "Failed to create surface.";
 
 #[cfg(not(unix))]
-pub fn create_surface_xcb(instance: VkInstance, connection: *mut Void,
-	window: u32) -> VkSurfaceKHR
-{
+pub fn create_surface_xcb(_: VkInstance, _: *mut Void, _: u32) -> VkSurfaceKHR {
 	panic!("Can't create XCB surface on not Unix.");
 }
 
@@ -79,8 +77,8 @@ pub fn create_surface_xcb(instance: VkInstance, connection: *mut Void,
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn create_surface_windows(instance: VkInstance, connection: *mut Void,
-	window: *mut Void) -> VkSurfaceKHR
+pub fn create_surface_windows(_: VkInstance, _: *mut Void, _: *mut Void)
+	-> VkSurfaceKHR
 {
 	panic!("Can't create Windows surface on not Windows.");
 }
@@ -114,10 +112,9 @@ pub fn create_surface_windows(instance: VkInstance, connection: *mut Void,
 	surface
 }
 
-#[cfg(not(target_os = "android"))]
-pub fn create_surface_android(instance: VkInstance, window: *mut Void)
-	-> VkSurfaceKHR
-{
+// TODO
+/* #[cfg(not(target_os = "android"))]
+pub fn create_surface_android(_: VkInstance, _: *mut Void) -> VkSurfaceKHR {
 	panic!("Can't create Android surface on not Android.");
 }
 
@@ -146,7 +143,7 @@ pub fn create_surface_android(instance: VkInstance, window: *mut Void)
 	};
 
 	surface
-}
+}*/
 
 pub fn create_surface(instance: VkInstance, connection: WindowConnection)
 	-> VkSurfaceKHR

@@ -15,7 +15,7 @@ pub mod create_surface;
 use asi_vulkan;
 use asi_vulkan::types::*;
 
-pub struct VulkanRenderer {
+/*pub struct VulkanRenderer {
 	native: vulkan::Vulkan,
 }
 
@@ -29,7 +29,7 @@ impl ::RenderOps for VulkanRenderer {
 
 	fn update(&self) -> () {
 	}
-}
+}*/
 
 // TODO: MAKE SURE WINDOWS DOESNT BREAK WITHOUT THIS
 /* extern {

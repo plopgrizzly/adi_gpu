@@ -24,9 +24,13 @@ pub(crate) mod renderer;
 mod render_ops;
 mod math;
 
-pub mod input {
+pub mod window {
 	pub use awi::Msg;
 	pub use awi::Input;
+	pub use awi::Key;
+	pub use awi::Button;
+	pub use awi::Joystick;
+	pub use awi::Click;
 }
 
 pub use render_ops::RenderOps;
@@ -59,10 +63,10 @@ impl Display {
 	}
 
 	/// Get input, if there is any.
-	pub fn input(&mut self) -> Option<input::Input> {
+	pub fn input(&mut self) -> Option<window::Input> {
 		let input = self.window.input();
 
-		if input == Some(input::Input::Resize) {
+		if input == Some(window::Input::Resize) {
 			self.renderer.resize(self.window.wh());
 		}
 

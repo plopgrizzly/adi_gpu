@@ -15,8 +15,8 @@ fn main() {
 	'app: loop {
 		// Go through this frame's input.
 		while let Some(input) = display.input() {
-			use adi_gpu::input::Input::*;
-			use adi_gpu::input::Msg::*;
+			use adi_gpu::window::Input::*;
+			use adi_gpu::window::Msg::*;
 
 			match input {
 				Msg(Quit) | Msg(Back) => break 'app,
