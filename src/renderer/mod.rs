@@ -99,6 +99,7 @@ pub struct Shape {
 
 pub struct Model {
 	vertex_buffer: VkBuffer,
+	#[allow(unused)] // TODO: Use for freeing
 	vertex_memory: VkDeviceMemory,
 	vertex_count: u32,
 	indice_count: u32,
@@ -109,12 +110,14 @@ pub struct Model {
 
 pub struct TexCoords {
 	vertex_buffer: VkBuffer,
+	#[allow(unused)] // TODO: Use for freeing
 	vertex_memory: VkDeviceMemory,
 	vertex_count: u32,
 }
 
 pub struct Gradient {
 	vertex_buffer: VkBuffer,
+	#[allow(unused)] // TODO: Use for freeing
 	vertex_memory: VkDeviceMemory,
 	vertex_count: u32,
 }
@@ -1255,6 +1258,7 @@ impl Renderer {
 		self.camera_memory.update(&self.connection);
 	}
 
+	#[allow(unused)]
 	pub fn fog(&mut self, color: ::math::Vec4<f32>, min: f32, max: f32) -> ()
 	{
 		self.effect_memory.data.fogc = [color.x, color.y, color.z, color.w];

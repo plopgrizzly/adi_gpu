@@ -22,6 +22,7 @@ impl<T> fmt::Debug for Vec4<T> where T: fmt::Debug + Copy + Clone {
 	}
 }
 
+#[allow(unused)]
 impl<T> Vec4<T> where T: Copy + Clone {
 	/// Create a new Vec3
 	pub fn new(x: T, y: T, z: T, w: T) -> Vec4<T> {
