@@ -1,22 +1,31 @@
-# Aldaron's Device Interface - Graphical Processing Unit
-Aldaron's Device Interface - Graphical Processing Unit, or adi_gpu for short, is
-a library for interfacing with a gpu.  You can use it to render graphics onto a
-surface.  Combined with awi, you can render to a window ( this is made easy with
-adi_screen ).
+# Aldaron's Device Interface - Graphical Processing Unit (adi_gpu 0.1.0)
 
-## Backends
-adi_gpu can use:
+[Aldaron's Device Interface / GPU (adi_gpu)](http://plopgrizzly.com/adi_gpu)
+is a library developed by [Plop Grizzly](http://plopgrizzly.com) for
+interfacing with the GPU to render graphics or do fast calculations.
+
+[Cargo](https://crates.io/crates/adi_gpu) /
+[Documentation](https://docs.rs/adi_gpu)
+
+## Features
+**adi_gpu**'s current features:
+* Render onto a Display (window).
+
+**adi_gpu**'s planned features:
+* Render onto a surface
+
+## Support
+**adi_gpu**'s current support:
 * Vulkan
 
-adi_gpu will be able to use:
+**adi_gpu**'s planned support:
 * OpenGL
 * Metal
 * Custom Drivers
 * Imaginary GPU ( using CPU for GPU operations )
 
-## Features
-adi_gpu can:
-* Render onto a window made with awi
+# Contributing
 
-adi_gpu will be able to:
-* Render onto a surface
+If you'd like to help implement functions for unsupported platforms, fix bugs,
+improve the API or improve the Documentation, then contact me at
+jeron.lau@plopgrizzly.com. I'll appreciate any help.
