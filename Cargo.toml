@@ -18,7 +18,10 @@
 [package]
 name = "adi_gpu"
 version = "0.1.0"
-authors = ["Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>", "Douglas P Lau"]
+authors = [
+	"Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>",
+	"Douglas Lau <doug.p.lau@gmail.com>"
+]
 
 ################################################################################
 
@@ -36,11 +39,14 @@ description = """
 """
 keywords = ["vulkan", "graphics", "rendering", "opengl", "gpu"]
 categories = ["rendering::graphics-api", "hardware-support",
-	"rendering::engine", "rendering", "no-std"]
+	"rendering::engine", "rendering"]
 
 ################################################################################
 
-exclude = ["examples/*", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", ".gitignore"]
+exclude = [
+	"examples/*", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", ".gitignore",
+	"_config.yml", "ISSUE_TEMPLATE.md", "icon.png", "icon.ico"
+]
 build = "build.rs"
 
 ################################################################################

@@ -20,6 +20,7 @@ pub fn float_lerp(a: Float, b: Float, t: Float) -> Float {
 /// Calculate intersection point of two lines.
 ///
 /// Returns None if the lines are colinear.
+#[allow(unused)]
 pub fn intersection(a0: Vec2, a1: Vec2, b0: Vec2, b1: Vec2) -> Option<Vec2> {
 	let av = a0 - a1;
 	let bv = b0 - b1;
@@ -97,6 +98,7 @@ impl ops::Neg for Vec2 {
 	}
 }
 
+#[allow(unused)]
 impl Vec2 {
 	/// Create a new Vec2
 	pub fn new(x: Float, y: Float) -> Self {

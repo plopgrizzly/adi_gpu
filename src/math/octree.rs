@@ -539,7 +539,7 @@ impl<T> Octree<T> where T: Pos {
 		}
 	}
 	/// Get the number of points in the octree.
-	pub fn len(&self) -> usize {
+	#[allow(unused)] pub fn len(&self) -> usize {
 		self.n_points as usize
 	}
 	/// Abort program on error if the octree is corrupt!
