@@ -25,19 +25,27 @@ use asi_vulkan::FogUniform;
 use asi_vulkan::Style;
 use asi_vulkan::VwInstance;
 
+#[derive(Clone)] #[repr(C)] struct TransformFullUniform {
+	mat4: [f32; 16],
+	hcam: u32,
+}
+
 #[derive(Clone)] #[repr(C)] struct TransformAndFadeUniform {
 	mat4: [f32; 16],
 	fade: f32,
+	hcam: u32,
 }
 
 #[derive(Clone)] #[repr(C)] struct TransformAndColorUniform {
 	mat4: [f32; 16],
 	vec4: [f32; 4],
+	hcam: u32,
 }
 
 pub enum ShapeHandle {
 	Alpha(u32),
 	Opaque(u32),
+	Gui(u32),
 }
 
 // TODO: no gcc dependency.
@@ -464,6 +472,7 @@ pub struct Renderer {
 	connection: Connection,
 	opaque_octree: ::math::Octree<Shape>,
 	alpha_octree: ::math::Octree<Shape>,
+	gui_vec: Vec<Shape>,
 	opaque_sorted: Vec<u32>,
 	alpha_sorted: Vec<u32>,
 //	opaque_points: ::math::Points,
@@ -639,6 +648,7 @@ impl Renderer {
 			camera_memory, effect_memory,
 			alpha_octree: ::math::Octree::new(),
 			opaque_octree: ::math::Octree::new(),
+			gui_vec: Vec::new(),
 			opaque_sorted: Vec::new(),
 			alpha_sorted: Vec::new(),
 //			alpha_points: ::math::Points::new(),
@@ -717,6 +727,10 @@ impl Renderer {
 		for id in self.alpha_sorted.iter() {
 			let shape = &self.alpha_octree[*id];
 
+			draw_shape(&self.connection, self.vw.command_buffer, shape);
+		}
+
+		for shape in self.gui_vec.iter() {
 			draw_shape(&self.connection, self.vw.command_buffer, shape);
 		}
 
@@ -876,8 +890,8 @@ impl Renderer {
 	}
 
 	pub fn textured(&mut self, model: usize, mat4: [f32; 16],
-		texture: Texture, texcoords: usize, alpha: bool, blend: bool)
-		-> ShapeHandle
+		texture: Texture, texcoords: usize, alpha: bool, blend: bool,
+		fog: bool, camera: bool) -> ShapeHandle
 	{
 		if self.models[model].vertex_count
 			!= self.texcoords[texcoords].vertex_count
@@ -900,7 +914,10 @@ impl Renderer {
 						self.style_natexture
 					}
 				},
-				TransformUniform { mat4 },
+				TransformFullUniform {
+					mat4,
+					hcam: fog as u32 + camera as u32,
+				},
 				&self.camera_memory, // TODO: at shader creation, not shape creation
 				&self.effect_memory,
 				texture.view,
@@ -924,7 +941,12 @@ impl Renderer {
 			position: ::Transform(mat4) * self.models[model].center,
 		};
 
-		if alpha {
+		println!("DBGU {}", fog as u32);
+
+		if !camera && !fog {
+			self.gui_vec.push(shape);
+			ShapeHandle::Gui(self.gui_vec.len() as u32 - 1)
+		} else if alpha {
 			ShapeHandle::Alpha(self.alpha_octree.add(shape))
 		} else {
 			ShapeHandle::Opaque(self.opaque_octree.add(shape))
@@ -932,7 +954,8 @@ impl Renderer {
 	}
 
 	pub fn solid(&mut self, model: usize, mat4: [f32; 16], color: [f32; 4],
-		alpha: bool, blend: bool) -> ShapeHandle
+		alpha: bool, blend: bool, fog: bool, camera: bool)
+		-> ShapeHandle
 	{
 		// Add an instance
 		let instance = unsafe {
@@ -951,6 +974,7 @@ impl Renderer {
 				},
 				TransformAndColorUniform {
 					vec4: color,
+					hcam: fog as u32 + camera as u32,
 					mat4,
 				},
 				&self.camera_memory,
@@ -976,7 +1000,10 @@ impl Renderer {
 			position: ::Transform(mat4) * self.models[model].center,
 		};
 
-		if alpha {
+		if !camera && !fog {
+			self.gui_vec.push(shape);
+			ShapeHandle::Gui(self.gui_vec.len() as u32 - 1)
+		} else if alpha {
 			ShapeHandle::Alpha(self.alpha_octree.add(shape))
 		} else {
 			ShapeHandle::Opaque(self.opaque_octree.add(shape))
@@ -984,7 +1011,8 @@ impl Renderer {
 	}
 
 	pub fn gradient(&mut self, model: usize, mat4: [f32; 16], colors: usize,
-		alpha: bool, blend: bool) -> ShapeHandle
+		alpha: bool, blend: bool, fog: bool, camera: bool)
+		-> ShapeHandle
 	{
 		if self.models[model].vertex_count
 			!= self.gradients[colors].vertex_count
@@ -1007,7 +1035,10 @@ impl Renderer {
 						self.style_nagradient
 					}
 				},
-				TransformUniform { mat4 },
+				TransformFullUniform {
+					mat4,
+					hcam: fog as u32 + camera as u32,
+				},
 				&self.camera_memory,
 				&self.effect_memory,
 				mem::zeroed(),
@@ -1031,7 +1062,10 @@ impl Renderer {
 			position: ::Transform(mat4) * self.models[model].center,
 		};
 
-		if alpha {
+		if !camera && !fog {
+			self.gui_vec.push(shape);
+			ShapeHandle::Gui(self.gui_vec.len() as u32 - 1)
+		} else if alpha {
 			ShapeHandle::Alpha(self.alpha_octree.add(shape))
 		} else {
 			ShapeHandle::Opaque(self.opaque_octree.add(shape))
@@ -1039,7 +1073,8 @@ impl Renderer {
 	}
 
 	pub fn faded(&mut self, model: usize, mat4: [f32; 16], texture: Texture,
-		texcoords: usize, fade_factor: f32, blend: bool) -> ShapeHandle
+		texcoords: usize, fade_factor: f32, blend: bool, fog: bool,
+		camera: bool) -> ShapeHandle
 	{
 		if self.models[model].vertex_count
 			!= self.texcoords[texcoords].vertex_count
@@ -1060,6 +1095,7 @@ impl Renderer {
 				},
 				TransformAndFadeUniform {
 					mat4,
+					hcam: fog as u32 + camera as u32,
 					fade: fade_factor,
 				},
 				&self.camera_memory,
@@ -1085,12 +1121,18 @@ impl Renderer {
 			position: ::Transform(mat4) * self.models[model].center,
 		};
 
-		ShapeHandle::Alpha(self.alpha_octree.add(shape))
+		if !camera && !fog {
+			self.gui_vec.push(shape);
+			ShapeHandle::Gui(self.gui_vec.len() as u32 - 1)
+		} else {
+			ShapeHandle::Alpha(self.alpha_octree.add(shape))
+		}
 	}
 
 	pub fn tinted(&mut self, model: usize, mat4: [f32; 16],
 		texture: Texture, texcoords: usize, color: [f32; 4],
-		alpha: bool, blend: bool) -> ShapeHandle
+		alpha: bool, blend: bool, fog: bool, camera: bool)
+		-> ShapeHandle
 	{
 		if self.models[model].vertex_count
 			!= self.texcoords[texcoords].vertex_count
@@ -1115,6 +1157,7 @@ impl Renderer {
 				},
 				TransformAndColorUniform {
 					mat4,
+					hcam: fog as u32 + camera as u32,
 					vec4: color,
 				},
 				&self.camera_memory,
@@ -1140,7 +1183,10 @@ impl Renderer {
 			position: ::Transform(mat4) * self.models[model].center,
 		};
 
-		if alpha {
+		if !camera && !fog {
+			self.gui_vec.push(shape);
+			ShapeHandle::Gui(self.gui_vec.len() as u32 - 1)
+		} else if alpha {
 			ShapeHandle::Alpha(self.alpha_octree.add(shape))
 		} else {
 			ShapeHandle::Opaque(self.opaque_octree.add(shape))
@@ -1149,7 +1195,7 @@ impl Renderer {
 
 	pub fn complex(&mut self, model: usize, mat4: [f32; 16],
 		texture: Texture, texcoords: usize, colors: usize, alpha: bool,
-		blend: bool) -> ShapeHandle
+		blend: bool, fog: bool, camera: bool) -> ShapeHandle
 	{
 		if self.models[model].vertex_count
 			!= self.texcoords[texcoords].vertex_count ||
@@ -1174,7 +1220,10 @@ impl Renderer {
 						self.style_nacomplex
 					}
 				},
-				TransformUniform { mat4 },
+				TransformFullUniform {
+					mat4,
+					hcam: fog as u32 + camera as u32,
+				},
 				&self.camera_memory,
 				&self.effect_memory,
 				texture.view,
@@ -1198,7 +1247,10 @@ impl Renderer {
 			position: ::Transform(mat4) * self.models[model].center,
 		};
 
-		if alpha {
+		if !camera && !fog {
+			self.gui_vec.push(shape);
+			ShapeHandle::Gui(self.gui_vec.len() as u32 - 1)
+		} else if alpha {
 			ShapeHandle::Alpha(self.alpha_octree.add(shape))
 		} else {
 			ShapeHandle::Opaque(self.opaque_octree.add(shape))
@@ -1233,6 +1285,17 @@ impl Renderer {
 
 				vulkan::copy_memory(&self.connection, self.vw.device,
 					self.alpha_octree[*x].instance.uniform_memory,
+					&uniform, mem::size_of::<TransformUniform>());
+			},
+			ShapeHandle::Gui(x) => {
+				let x = x as usize; // for indexing
+				let mut shape = self.gui_vec[x].clone();
+
+				shape.position = ::Transform(transform.0) *
+					self.gui_vec[x].center;
+
+				vulkan::copy_memory(&self.connection, self.vw.device,
+					self.gui_vec[x].instance.uniform_memory,
 					&uniform, mem::size_of::<TransformUniform>());
 			},
 		}
