@@ -17,14 +17,14 @@ static inline void vw_vulkan_error(const char *msg, VkResult result) {
 	}
 }
 
-// TODO: Remove after Windows port works.
+/*// TODO: Remove after Windows port works.
 float* test_map(VkDevice device, VkDeviceMemory vertex_buffer_memory, uint64_t wholesize) {
 	void* mapped = NULL;
 	vw_vulkan_error("Failed to test map buffer memory.", vkMapMemory(
 		device, vertex_buffer_memory, 0, wholesize, 0,
 		&mapped));
 	return mapped;
-}
+}*/
 
 /*void vw_vulkan_animate(vw_t* vulkan, vw_texture_t* tx, uint32_t w, uint32_t h,
 	const uint8_t* p)

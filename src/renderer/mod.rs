@@ -182,6 +182,16 @@ extern {
 	fn vw_vulkan_draw_update(v: *mut Vw) -> ();
 }
 
+// TODO: Move FFI to asi_vulkan.
+fn draw_begin(connection: &Connection, r: f32, g: f32, b: f32) {
+	
+}
+
+// TODO: Move FFI to asi_vulkan.
+fn draw_update(connection: &Connection) {
+	
+}
+
 fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 	unsafe {
 		// Link swapchain to vulkan instance.
