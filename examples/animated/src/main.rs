@@ -42,34 +42,35 @@ pub fn resize(display: &mut adi_gpu::Display, image_tex: adi_gpu::Texture,
 	adi_gpu::ShapeBuilder::new(square_model)
 		.push_solid(display, adi_gpu::Transform::new()
 			.translate(0.0, 0.0, 0.5).rotate(0.25, 0.0, 0.0),
-			[0.5, 1.0, 0.5, 0.5], false, false);
+			[0.5, 1.0, 0.5, 0.5], false, false, true, true);
 	// image
 	adi_gpu::ShapeBuilder::new(image_model)
 		.push_texture(display, adi_gpu::Transform::new(), image_tex,
-		image_texcoords, false, false);
+		image_texcoords, false, false, true, true);
 	// logo
 	adi_gpu::ShapeBuilder::new(image_model)
 		.push_texture(display, adi_gpu::Transform::new()
 			.translate(0.5, 0.5, 0.0), logo_tex, image_texcoords,
-			false, false);
+			false, false, true, true);
 	// triangle
 	adi_gpu::ShapeBuilder::new(triangle_model)
-		.push_gradient(display, adi_gpu::Transform::new(), gradient, false, false);
+		.push_gradient(display, adi_gpu::Transform::new(), gradient,
+			false, false, true, true);
 	// new!
 	adi_gpu::ShapeBuilder::new(image_model)
 		.push_faded(display, adi_gpu::Transform::new()
 			.translate(1.0, 1.0, 0.0), image_tex, image_texcoords,
-			0.5, false);
+			0.5, false, true, true);
 	// new!
 	adi_gpu::ShapeBuilder::new(image_model)
 		.push_tinted(display, adi_gpu::Transform::new()
 			.translate(1.5, 1.5, 0.0), image_tex, image_texcoords,
-			[1.0, 1.0, 0.0, 1.0], false, false);
+			[1.0, 1.0, 0.0, 1.0], false, false, true, true);
 	// new!
 	adi_gpu::ShapeBuilder::new(image_model)
 		.push_complex(display, adi_gpu::Transform::new()
 			.translate(1.0, 1.5, 0.0), image_tex, image_texcoords,
-			complexity, false, false);
+			complexity, false, false, true, true);
 }
 
 fn main() {

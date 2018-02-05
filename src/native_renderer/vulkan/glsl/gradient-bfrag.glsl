@@ -9,6 +9,7 @@
 
 layout (binding = 0) uniform UniformBuffer {
 	mat4 models_tfm; // The Models' Transform Matrix
+	int has_camera;
 } uniforms;
 layout (binding = 1) uniform Camera {
 	mat4 matrix; // The Camera's Transform & Projection Matrix
@@ -26,10 +27,12 @@ layout (location = 0) out vec4 frag_color;
 void main() {
 	if(in_color.a <= 0.0) {
 		discard;
-	} else {
+	} else if(uniforms.has_camera == 2) {
 		// Fog Calculation
 		float linear = clamp((z-fog.range.x) / fog.range.y, 0.0, 1.0);
 		float curved = linear * linear * linear;
 		frag_color = mix(in_color, fog.fog, curved);
+	} else {
+		frag_color = in_color;
 	}
 }

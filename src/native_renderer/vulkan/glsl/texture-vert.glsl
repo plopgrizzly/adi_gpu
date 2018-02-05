@@ -9,6 +9,7 @@
 
 layout (binding = 0) uniform UniformBuffer {
 	mat4 models_tfm; // The Models' Transform Matrix
+	int has_camera;
 } uniforms;
 layout (binding = 1) uniform Camera {
 	mat4 matrix; // The Camera's Transform & Projection Matrix
@@ -27,6 +28,14 @@ layout (location = 1) out float z;
 
 void main() {
 	texcoord = texpos;
-	gl_Position = camera.matrix * (uniforms.models_tfm * vec4(pos.xyz,1.0));
+
+	vec4 place = uniforms.models_tfm * vec4(pos.xyz, 1.0);
+
+	if(uniforms.has_camera >= 1) {
+		gl_Position = camera.matrix * place;
+	} else {
+		gl_Position = place;
+	}
+
 	z = length(gl_Position.xyz);
 }
