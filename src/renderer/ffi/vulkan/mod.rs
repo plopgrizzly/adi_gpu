@@ -31,22 +31,6 @@ impl ::RenderOps for VulkanRenderer {
 	}
 }*/
 
-// TODO: MAKE SURE WINDOWS DOESNT BREAK WITHOUT THIS
-/* extern {
-	fn test_map(vulkan: VkDevice, vertex_buffer_memory: VkDeviceMemory, c: u64) -> *mut f32;
-}*/
-
-#[cfg(feature = "checks")]
-fn check_error(name: &str, error: VkResult) {
-	match error {
-		VkResult::Success => {},
-		_ => panic!("{} Failed {}", name, error),
-	}
-}
-
-#[cfg(not(feature = "checks"))]
-fn check_error(_: &str, _: VkResult) { }
-
 pub fn copy_memory<T>(connection: &asi_vulkan::Connection, vk_device: VkDevice,
 	vk_memory: VkDeviceMemory, data: *const T, size: usize) where T: Clone
 {

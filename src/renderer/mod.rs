@@ -184,22 +184,6 @@ impl Shape {
 	}*/
 }
 
-extern {
-	fn vw_vulkan_draw_begin(v: *mut Vw, r: f32, g: f32, b: f32) -> ();
-// TODO: In Rust
-	fn vw_vulkan_draw_update(v: *mut Vw) -> ();
-}
-
-// TODO: Move FFI to asi_vulkan.
-fn draw_begin(connection: &Connection, r: f32, g: f32, b: f32) {
-	
-}
-
-// TODO: Move FFI to asi_vulkan.
-fn draw_update(connection: &Connection) {
-	
-}
-
 fn swapchain_resize(connection: &Connection, vw: &mut Vw) -> () {
 	unsafe {
 		// Link swapchain to vulkan instance.
@@ -387,8 +371,8 @@ impl Vw {
 		let connection = vulkan::vulkan::Vulkan::new(window_name).unwrap();
 
 		let instance = connection.0.vk;
-		let surface = vulkan::create_surface::create_surface(	
-			instance, window_connection);
+		let surface = vulkan::create_surface::create_surface(
+			&connection.0, instance, window_connection);
 		let (gpu, pqi, sampled) = unsafe {
 			asi_vulkan::get_gpu(&connection.0, instance, surface)
 		};
@@ -719,9 +703,17 @@ impl Renderer {
 				&self.connection,
 				self.vw.device,
 			);
-
-			vw_vulkan_draw_begin(&mut self.vw, self.clear_color.0,
-				self.clear_color.1, self.clear_color.2);
+			
+			asi_vulkan::draw_begin(&self.connection,
+				self.vw.command_buffer,
+				self.vw.render_pass,
+				self.vw.present_images[self.vw.next_image_index as usize],
+				self.vw.frame_buffers[self.vw.next_image_index as usize],
+				self.vw.width,
+				self.vw.height,
+				self.clear_color.0, self.clear_color.1,
+				self.clear_color.2
+			);
 		}
 
 		let frustum = matrix * self.frustum;
@@ -748,7 +740,46 @@ impl Renderer {
 		}
 
 		unsafe {
-			vw_vulkan_draw_update(&mut self.vw);
+			asi_vulkan::end_render_pass(&self.connection,
+				self.vw.command_buffer);
+
+			asi_vulkan::pipeline_barrier(&self.connection,
+				self.vw.command_buffer,
+				self.vw.present_images[self.vw.next_image_index as usize]);
+
+			asi_vulkan::end_cmdbuff(&self.connection,
+				self.vw.command_buffer);
+
+			let fence = asi_vulkan::create_fence(&self.connection,
+				self.vw.device);
+
+			asi_vulkan::queue_submit(&self.connection,
+				self.vw.command_buffer, fence,
+				VkPipelineStage::BottomOfPipe,
+				self.vw.present_queue);
+				
+			asi_vulkan::wait_fence(&self.connection, self.vw.device,
+				fence);
+				
+			asi_vulkan::fence_drop(&self.connection, self.vw.device,
+				fence);
+				
+			asi_vulkan::queue_present(&self.connection,
+				self.vw.present_queue,
+				self.vw.rendering_complete_sem,
+				self.vw.swapchain,
+				self.vw.next_image_index);
+				
+			asi_vulkan::drop_semaphore(&self.connection,
+				self.vw.device,
+				self.vw.presenting_complete_sem);
+				
+			asi_vulkan::drop_semaphore(&self.connection,
+				self.vw.device,
+				self.vw.rendering_complete_sem);
+				
+			asi_vulkan::wait_idle(&self.connection,
+				self.vw.device);
 		}
 	}
 
@@ -953,8 +984,6 @@ impl Renderer {
 			center: self.models[model].center,
 			position: ::Transform(mat4) * self.models[model].center,
 		};
-
-		println!("DBGU {}", fog as u32);
 
 		if !camera && !fog {
 			self.gui_vec.push(shape);

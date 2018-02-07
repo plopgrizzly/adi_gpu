@@ -47,7 +47,6 @@ exclude = [
 	"examples/*", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", ".gitignore",
 	"_config.yml", "ISSUE_TEMPLATE.md", "icon.png", "icon.ico"
 ]
-build = "build.rs"
 
 ################################################################################
 
@@ -57,11 +56,8 @@ ami = "^0.5"
 awi = "^0.1.1"
 asi_vulkan = { path = "../asi_vulkan" } # "^0.1.1"
 
-[build-dependencies.gcc]
-version = "0.3.50"
-
 [features]
 checks = ["asi_vulkan/checks"]
 validation = ["asi_vulkan/validation"]
 
-################################################################################
+###############################################################################
