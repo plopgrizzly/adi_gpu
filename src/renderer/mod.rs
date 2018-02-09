@@ -78,8 +78,8 @@ pub struct Vw {
 	sampled: bool,
 }
 
-#[repr(C)]
-#[derive(Copy, Clone)]
+/// A texture on the GPU.
+#[derive(Copy, Clone)] // TODO - probably shouldn't derive
 pub struct Texture {
 	mappable_image: VkImage,
 	mappable_memory: VkDeviceMemory,

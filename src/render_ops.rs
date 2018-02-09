@@ -4,9 +4,10 @@
 //
 // src/render_ops.rs
 
+/// This trait is for implementing new platform support.  TODO It is incomplete.
 pub trait RenderOps {
-	// Create the renderer.
+	/// Create the renderer.
 	fn new(app_name: &str, window: ::awi::WindowConnection) -> Self;
-	// Do the rendering.
+	/// Do the rendering.
 	fn update(&self) -> ();
 }

@@ -1,4 +1,4 @@
-# Aldaron's Device Interface - Graphical Processing Unit (adi_gpu 0.1.0)
+# Aldaron's Device Interface - Graphical Processing Unit (adi_gpu 0.2.0)
 
 [Aldaron's Device Interface / GPU (adi_gpu)](http://plopgrizzly.com/adi_gpu)
 is a library developed by [Plop Grizzly](http://plopgrizzly.com) for

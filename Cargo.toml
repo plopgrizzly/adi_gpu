@@ -17,7 +17,7 @@
 
 [package]
 name = "adi_gpu"
-version = "0.1.0"
+version = "0.2.0"
 authors = [
 	"Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>",
 	"Douglas Lau <doug.p.lau@gmail.com>"
@@ -54,7 +54,7 @@ exclude = [
 afi = "^0.3.1"
 ami = "^0.5"
 awi = "^0.1.1"
-asi_vulkan = { path = "../asi_vulkan" } # "^0.1.1"
+asi_vulkan = "^0.2"
 
 [features]
 checks = ["asi_vulkan/checks"]

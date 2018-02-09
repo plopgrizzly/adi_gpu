@@ -24,6 +24,7 @@ pub(crate) mod renderer;
 mod render_ops;
 mod math;
 
+/// Types specifically for window operations.
 pub mod window {
 	pub use awi::Msg;
 	pub use awi::Input;
@@ -91,12 +92,15 @@ impl Display {
 	}
 }
 
+/// A list of vertices that make a shape.
 #[derive(Copy, Clone)]
 pub struct Model(usize);
 
+/// A list of colors to be paired with vertices.
 #[derive(Copy, Clone)]
 pub struct Gradient(usize);
 
+/// A list of texture coordinates to be paired with vertices.
 #[derive(Copy, Clone)]
 pub struct TexCoords(usize);
 
