@@ -17,7 +17,7 @@
 
 [package]
 name = "adi_gpu"
-version = "0.2.0"
+version = "0.3.0"
 authors = [
 	"Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>",
 	"Douglas Lau <doug.p.lau@gmail.com>"
@@ -52,12 +52,27 @@ exclude = [
 
 [dependencies]
 afi = "^0.3.1"
-ami = "^0.5"
-awi = "^0.1.1"
-asi_vulkan = "^0.2"
+ami = "^0.6"
+awi = "^0.2"
+adi_gpu_vulkan = "^0.1"
+adi_gpu_base = "^0.1"
 
-[features]
-checks = ["asi_vulkan/checks"]
-validation = ["asi_vulkan/validation"]
+# [dependencies.asi_vulkan]
+# version = "^0.2"
+# default-features = true
+# optional = true
 
-###############################################################################
+# [dependencies.asi_opengl]
+# path = "../asi_opengl"
+## version = "^0.2"
+# default-features = true
+# optional = true
+
+#[features]
+#default = ["vulkan", "opengl"]
+#checks = ["asi_vulkan/checks"]
+#validation = ["asi_vulkan/validation"]
+#vulkan = ["asi_vulkan"]
+#opengl = ["asi_opengl"]
+
+################################################################################

@@ -1,5 +1,5 @@
 # Aldaron's Device Interface / GPU                                             #
-# Copyright (c) 2017 Plop Grizzly, Jeron Lau <jeron.lau@plopgrizzly.com>       #
+# Copyright (c) 2017-2018 Jeron Lau <jeron.lau@plopgrizzly.com>                #
 # Licensed under the MIT LICENSE                                               #
 #                                                                              #
 # examples/minimal/Cargo.toml                                                  #
@@ -11,10 +11,5 @@ authors = ["Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>"]
 
 [dependencies]
 adi_gpu = { path = "../../" }
-aci_png = "0.5.1"
-
-# Enable checks & validation
-[features]
-default = []#"checks", "validation"]
-checks = ["adi_gpu/checks"]
-validation = ["adi_gpu/validation"]
+aci_png = "^0.5.1"
+awi = { path = "/home/aldaron/dev/awi" }

@@ -1,22 +1,28 @@
 // Aldaron's Device Interface / GPU
-// Copyright (c) 2017 Plop Grizzly, Jeron Lau <jeron.lau@plopgrizzly.com>
+// Copyright (c) 2017-2018 Jeron Lau <jeron.lau@plopgrizzly.com>
 // Licensed under the MIT LICENSE
 //
 // examples/minimal/main.rs
 
 extern crate adi_gpu;
 extern crate aci_png;
+extern crate awi;
+
+use adi_gpu::DisplayTrait;
 
 fn main() {
-	let mut display = adi_gpu::Display::new("Willow Minimal Example",
-		aci_png::decode(include_bytes!("../res/icon.png")).unwrap(),
-		(0.25, 0.25, 1.0), (20.0, 10.0));
+	let mut window = awi::Window::new("ADI_GPU Minimal Example",
+		aci_png::decode(include_bytes!("../res/icon.png")).unwrap());
+	let mut display = adi_gpu::Display::new(&window).unwrap();
+
+	display.color((0.25, 0.25, 1.0));
+	display.fog(Some((20.0, 10.0)));
 
 	'app: loop {
 		// Go through this frame's input.
-		while let Some(input) = display.input() {
-			use adi_gpu::window::Input::*;
-			use adi_gpu::window::Msg::*;
+		while let Some(input) = window.input() {
+			use awi::Input::*;
+			use awi::Msg::*;
 
 			match input {
 				Msg(Quit) | Msg(Back) => break 'app,
