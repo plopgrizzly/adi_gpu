@@ -19,8 +19,8 @@
 name = "adi_gpu"
 version = "0.3.0"
 authors = [
-	"Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>",
-	"Douglas Lau <doug.p.lau@gmail.com>"
+	"Jeron A. Lau <jeron.lau@plopgrizzly.com>",
+	"Douglas P. Lau <doug.p.lau@gmail.com>"
 ]
 
 ################################################################################
@@ -51,7 +51,7 @@ exclude = [
 ################################################################################
 
 [dependencies]
-afi = { path = "../afi" } # "^0.3.1"
+afi = "^0.3.2"
 ami = "^0.6"
 awi = { path = "../awi" } # "^0.2"
 adi_gpu_vulkan = { path = "../adi_gpu_vulkan" } # "^0.1"
