@@ -51,11 +51,12 @@ exclude = [
 ################################################################################
 
 [dependencies]
-afi = "^0.3.1"
+afi = { path = "../afi" } # "^0.3.1"
 ami = "^0.6"
-awi = "^0.2"
-adi_gpu_vulkan = "^0.1"
-adi_gpu_base = "^0.1"
+awi = { path = "../awi" } # "^0.2"
+adi_gpu_vulkan = { path = "../adi_gpu_vulkan" } # "^0.1"
+adi_gpu_opengl = { path = "../adi_gpu_opengl" }
+adi_gpu_base = { path = "../adi_gpu_base" } #"^0.1"
 
 # [dependencies.asi_vulkan]
 # version = "^0.2"
