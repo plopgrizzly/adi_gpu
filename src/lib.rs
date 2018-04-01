@@ -33,7 +33,7 @@ impl DisplayTrait for Display {
 	type Texture = Texture;
 
 	fn new(title: &str, icon: &afi::Graphic) -> Option<Self> {
-		/*if let Some(vulkan) = adi_gpu_vulkan::Display::new(title, icon) {
+		/* if let Some(vulkan) = adi_gpu_vulkan::Display::new(title, icon) {
 			Some(Display::Vulkan(vulkan))
 		} else */if let Some(opengl) = adi_gpu_opengl::Display::new(title, icon) {
 			Some(Display::OpenGL(opengl))
