@@ -1,62 +1,47 @@
-# Aldaron's Device Interface / GPU                                             #
-# Copyright (c) 2017-2018 Jeron Lau <jeron.lau@plopgrizzly.com>                #
-# Licensed under the MIT LICENSE                                               #
-#                             _        _                                       #
-#                            /@\——————/@\                                      #
-# .———  .                   |   o    o   |     .————      .            .       #
-# |   | |  .———   .———   .——.     []     .——.  |      .——    ———: ———: | .   . #
-# |   | |  |   |  |   |  \   \   <##>   /   /  |      |   |    /    /  | |   | #
-# |———  |  |   |  |   |   |   ¯        ¯   |   |   -- |   |   /    /   |  \ /  #
-# |     |  |   |  |———    |                |   |    | |   |  /    /    |   |   #
-# |     |   ———   |       |                |    ————  |   | :——— :———  |   |   #
-#                 |        \              /                              __/   #
-#                           ¯————————————¯                                     #
-# Cargo.toml                                                                   #
-
-################################################################################
+# Cargo.toml -- Aldaron's Device Interface / GPU
+# Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
+# Licensed under the MIT LICENSE
+#                             _        _
+#                            /@\——————/@\
+# .———  .                   |   o    o   |     .————      .            .
+# |   | |  .———   .———   .——.     []     .——.  |      .——    ———: ———: | .   .
+# |   | |  |   |  |   |  \   \   <##>   /   /  |      |   |    /    /  | |   |
+# |———  |  |   |  |   |   |   ¯        ¯   |   |   -- |   |   /    /   |  \ /
+# |     |  |   |  |———    |                |   |    | |   |  /    /    |   |
+# |     |   ———   |       |                |    ————  |   | :——— :———  |   |
+#                 |        \              /                              __/
+#                           ¯————————————¯
 
 [package]
 name = "adi_gpu"
-version = "0.3.0"
+version = "0.4.0"
 authors = [
 	"Jeron A. Lau <jeron.lau@plopgrizzly.com>",
 	"Douglas P. Lau <doug.p.lau@gmail.com>"
 ]
-
-################################################################################
 
 license = "MIT"
 documentation = "https://docs.rs/adi_gpu"
 homepage = "http://plopgrizzly.com/adi_gpu"
 repository = "https://github.com/plopgrizzly/adi_gpu"
 
-################################################################################
-
 readme = "README.md"
-description = """
-    Aldaron's Device Interface / GPU is a library developed by Plop Grizzly for
-    interfacing with the GPU to render graphics or do fast calculations.
-"""
+description = "GPU interface - render graphics and do fast calculations"
 keywords = ["vulkan", "graphics", "rendering", "opengl", "gpu"]
 categories = ["rendering::graphics-api", "hardware-support",
 	"rendering::engine", "rendering"]
-
-################################################################################
 
 exclude = [
 	"examples/*", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", ".gitignore",
 	"_config.yml", "ISSUE_TEMPLATE.md", "icon.png", "icon.ico"
 ]
 
-################################################################################
-
 [dependencies]
 afi = "^0.3.2"
 ami = "^0.6"
-awi = { path = "../awi" } # "^0.2"
-adi_gpu_vulkan = { path = "../adi_gpu_vulkan" } # "^0.1"
-adi_gpu_opengl = { path = "../adi_gpu_opengl" }
-adi_gpu_base = { path = "../adi_gpu_base" } #"^0.1"
+adi_gpu_vulkan = "^0.2"
+adi_gpu_opengl = "^0.1"
+adi_gpu_base = "^0.2"
 
 # [dependencies.asi_vulkan]
 # version = "^0.2"
@@ -75,5 +60,3 @@ adi_gpu_base = { path = "../adi_gpu_base" } #"^0.1"
 #validation = ["asi_vulkan/validation"]
 #vulkan = ["asi_vulkan"]
 #opengl = ["asi_opengl"]
-
-################################################################################

@@ -1,7 +1,6 @@
-// Aldaron's Device Interface / GPU
-// Copyright (c) 2018 Jeron Lau <jeron.lau@plopgrizzly.com>
+// lib.rs -- Aldaron's Device Interface / GPU
+// Copyright (c) 2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 // Licensed under the MIT LICENSE
-// src/lib.rs
 
 //! Aldaron's Device Interface / GPU is a library developed by Plop Grizzly for
 //! interfacing with the GPU to render graphics or do fast calculations.
@@ -11,17 +10,16 @@ extern crate adi_gpu_vulkan;
 extern crate adi_gpu_base;
 extern crate afi;
 extern crate ami;
-extern crate awi;
 
-pub use base::Model;
-pub use base::TexCoords;
-pub use base::Gradient;
-pub use base::Shape;
-pub use base::Display as DisplayTrait;
-pub use base::Texture as TextureTrait;
 pub use ami::Mat4;
 
 use adi_gpu_base as base;
+
+pub use base::{
+	Model, TexCoords, Gradient, Shape,
+	Input, Key, Click, Msg, // Window
+	Display as DisplayTrait, Texture as TextureTrait, // Traits
+};
 
 /// To render anything with adi_gpu, you have to make a `Display`
 pub enum Display {
@@ -33,9 +31,9 @@ impl DisplayTrait for Display {
 	type Texture = Texture;
 
 	fn new(title: &str, icon: &afi::Graphic) -> Option<Self> {
-		/*if let Some(vulkan) = adi_gpu_vulkan::Display::new(title, icon) {
+		if let Some(vulkan) = adi_gpu_vulkan::Display::new(title, icon) {
 			Some(Display::Vulkan(vulkan))
-		} else */if let Some(opengl) = adi_gpu_opengl::Display::new(title, icon) {
+		} else if let Some(opengl) = adi_gpu_opengl::Display::new(title, icon) {
 			Some(Display::OpenGL(opengl))
 		} else {
 			None
@@ -53,7 +51,7 @@ impl DisplayTrait for Display {
 		}
 	}
 
-	fn update(&mut self) -> Option<awi::Input> {
+	fn update(&mut self) -> Option<Input> {
 		match *self {
 			Display::Vulkan(ref mut display) => {
 				display.update()

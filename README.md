@@ -1,4 +1,4 @@
-# Aldaron's Device Interface - Graphical Processing Unit (adi_gpu 0.3.0)
+# Aldaron's Device Interface - GPU (adi_gpu 0.4.0)
 
 [Aldaron's Device Interface / GPU (adi_gpu)](http://plopgrizzly.com/adi_gpu)
 is a library developed by [Plop Grizzly](http://plopgrizzly.com) for
@@ -17,11 +17,11 @@ interfacing with the GPU to render graphics or do fast calculations.
 ## Support
 **adi_gpu**'s current support:
 * Vulkan
+* OpenGL/(ES)
 
 **adi_gpu**'s planned support:
-* OpenGL
-* Metal
-* Custom Drivers
+* Metal (or just use MoltenVK?)
+* Custom Implementation API
 * Imaginary GPU ( using CPU for GPU operations )
 
 # Contributing
