@@ -53,7 +53,7 @@ impl DisplayTrait for Display {
 		}
 	}
 
-	fn update(&mut self) {
+	fn update(&mut self) -> Option<awi::Input> {
 		match *self {
 			Display::Vulkan(ref mut display) => {
 				display.update()
@@ -360,17 +360,6 @@ impl DisplayTrait for Display {
 			}
 			Display::OpenGL(ref display) => {
 				display.wh()
-			}
-		}
-	}
-
-	fn input(&mut self) -> Option<awi::Input> {
-		match *self {
-			Display::Vulkan(ref mut display) => {
-				display.input()
-			}
-			Display::OpenGL(ref mut display) => {
-				display.input()
 			}
 		}
 	}

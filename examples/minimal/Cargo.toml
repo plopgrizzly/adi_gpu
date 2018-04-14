@@ -12,4 +12,3 @@ authors = ["Jeron Aldaron Lau <jeron.lau@plopgrizzly.com>"]
 [dependencies]
 adi_gpu = { path = "../../" }
 aci_png = "^0.5.1"
-awi = { path = "/home/aldaron/dev/awi" }
