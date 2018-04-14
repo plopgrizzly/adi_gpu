@@ -33,7 +33,7 @@ impl DisplayTrait for Display {
 	type Texture = Texture;
 
 	fn new(title: &str, icon: &afi::Graphic) -> Option<Self> {
-		/* if let Some(vulkan) = adi_gpu_vulkan::Display::new(title, icon) {
+		/*if let Some(vulkan) = adi_gpu_vulkan::Display::new(title, icon) {
 			Some(Display::Vulkan(vulkan))
 		} else */if let Some(opengl) = adi_gpu_opengl::Display::new(title, icon) {
 			Some(Display::OpenGL(opengl))
@@ -155,50 +155,42 @@ impl DisplayTrait for Display {
 
 	#[inline(always)]
 	fn shape_solid(&mut self, model: &Model, transform: Mat4,
-		color: [f32; 4], blending: bool, fancy: bool, fog: bool,
-		camera: bool) -> Shape
+		color: [f32; 4], blending: bool, fog: bool, camera: bool)
+		-> Shape
 	{
 		match *self {
 			Display::Vulkan(ref mut display) => {
-				display.shape_solid(
-					model, transform, color,
-					blending, fancy, fog, camera
-				)
+				display.shape_solid(model, transform, color,
+					blending, fog, camera)
 			}
 			Display::OpenGL(ref mut display) => {
-				display.shape_solid(
-					model, transform, color,
-					blending, fancy, fog, camera
-				)
+				display.shape_solid(model, transform, color,
+					blending, fog, camera)
 			}
 		}
 	}
 
 	#[inline(always)]
 	fn shape_gradient(&mut self, model: &Model, transform: Mat4,
-		colors: Gradient, blending: bool, fancy: bool, fog: bool,
-		camera: bool) -> Shape
+		colors: Gradient, blending: bool, fog: bool, camera: bool)
+		-> Shape
 	{
 		match *self {
 			Display::Vulkan(ref mut display) => {
-				display.shape_gradient(
-					model, transform, colors,
-					blending, fancy, fog, camera
-				)
+				display.shape_gradient(model, transform, colors,
+					blending, fog, camera)
 			}
 			Display::OpenGL(ref mut display) => {
-				display.shape_gradient(
-					model, transform, colors,
-					blending, fancy, fog, camera
-				)
+				display.shape_gradient(model, transform, colors,
+					blending, fog, camera)
 			}
 		}
 	}
 
 	#[inline(always)]
 	fn shape_texture(&mut self, model: &Model, transform: Mat4,
-		texture: Texture, tc: TexCoords, blending: bool, fancy: bool,
-		fog: bool, camera: bool) -> Shape
+		texture: Texture, tc: TexCoords, blending: bool, fog: bool,
+		camera: bool) -> Shape
 	{
 		match *self {
 			Display::Vulkan(ref mut display) => {
@@ -210,7 +202,7 @@ impl DisplayTrait for Display {
 						}
 						_ => panic!("mismatch"),
 					},
-					tc, blending, fancy, fog, camera
+					tc, blending, fog, camera
 				)
 			}
 			Display::OpenGL(ref mut display) => {
@@ -222,7 +214,7 @@ impl DisplayTrait for Display {
 						}
 						_ => panic!("mismatch"),
 					},
-					tc, blending, fancy, fog, camera
+					tc, blending, fog, camera
 				)
 			}
 		}
@@ -230,8 +222,8 @@ impl DisplayTrait for Display {
 
 	#[inline(always)]
 	fn shape_faded(&mut self, model: &Model, transform: Mat4,
-		texture: Texture, tc: TexCoords, alpha: f32, fancy: bool,
-		fog: bool, camera: bool) -> Shape
+		texture: Texture, tc: TexCoords, alpha: f32, fog: bool,
+		camera: bool) -> Shape
 	{
 		match *self {
 			Display::Vulkan(ref mut display) => {
@@ -243,7 +235,7 @@ impl DisplayTrait for Display {
 						}
 						_ => panic!("mismatch"),
 					},
-					tc, alpha, fancy, fog, camera
+					tc, alpha, fog, camera
 				)
 			}
 			Display::OpenGL(ref mut display) => {
@@ -255,7 +247,7 @@ impl DisplayTrait for Display {
 						}
 						_ => panic!("mismatch"),
 					},
-					tc, alpha, fancy, fog, camera
+					tc, alpha, fog, camera
 				)
 			}
 		}
@@ -264,7 +256,7 @@ impl DisplayTrait for Display {
 	#[inline(always)]
 	fn shape_tinted(&mut self, model: &Model, transform: Mat4,
 		texture: Texture, tc: TexCoords, tint: [f32; 4], blending: bool,
-		fancy: bool, fog: bool, camera: bool) -> Shape
+		fog: bool, camera: bool) -> Shape
 	{
 		match *self {
 			Display::Vulkan(ref mut display) => {
@@ -276,8 +268,7 @@ impl DisplayTrait for Display {
 						}
 						_ => panic!("mismatch"),
 					},
-					tc, tint, blending,
-					fancy, fog, camera
+					tc, tint, blending, fog, camera
 				)
 			}
 			Display::OpenGL(ref mut display) => {
@@ -289,8 +280,7 @@ impl DisplayTrait for Display {
 						}
 						_ => panic!("mismatch"),
 					},
-					tc, tint, blending,
-					fancy, fog, camera
+					tc, tint, blending, fog, camera
 				)
 			}
 		}
@@ -299,7 +289,7 @@ impl DisplayTrait for Display {
 	#[inline(always)]
 	fn shape_complex(&mut self, model: &Model, transform: Mat4,
 		texture: Texture, tc: TexCoords, tints: Gradient,
-		blending: bool, fancy: bool, fog: bool, camera: bool) -> Shape
+		blending: bool, fog: bool, camera: bool) -> Shape
 	{
 		match *self {
 			Display::Vulkan(ref mut display) => {
@@ -311,8 +301,7 @@ impl DisplayTrait for Display {
 						}
 						_ => panic!("mismatch"),
 					},
-					tc, tints,
-					blending, fancy, fog, camera
+					tc, tints, blending, fog, camera
 				)
 			}
 			Display::OpenGL(ref mut display) => {
@@ -324,14 +313,13 @@ impl DisplayTrait for Display {
 						}
 						_ => panic!("mismatch"),
 					},
-					tc, tints,
-					blending, fancy, fog, camera
+					tc, tints, blending, fog, camera
 				)
 			}
 		}
 	}
 
-	fn transform(&mut self, shape: &mut Shape, transform: &Mat4) {
+	fn transform(&mut self, shape: &mut Shape, transform: Mat4) {
 		match *self {
 			Display::Vulkan(ref mut display) => {
 				display.transform(shape, transform)
