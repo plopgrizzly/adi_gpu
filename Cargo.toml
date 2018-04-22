@@ -14,7 +14,7 @@
 
 [package]
 name = "adi_gpu"
-version = "0.4.0"
+version = "0.5.0"
 authors = [
 	"Jeron A. Lau <jeron.lau@plopgrizzly.com>",
 	"Douglas P. Lau <doug.p.lau@gmail.com>"
@@ -37,11 +37,10 @@ exclude = [
 ]
 
 [dependencies]
-afi = "^0.3.2"
 ami = "^0.6"
-adi_gpu_vulkan = "^0.2"
-adi_gpu_opengl = "^0.1"
-adi_gpu_base = "^0.2"
+adi_gpu_vulkan = "^0.3"
+adi_gpu_opengl = "^0.2"
+adi_gpu_base = "^0.4"
 
 # [dependencies.asi_vulkan]
 # version = "^0.2"

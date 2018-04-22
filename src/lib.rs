@@ -8,7 +8,6 @@
 extern crate adi_gpu_opengl;
 extern crate adi_gpu_vulkan;
 extern crate adi_gpu_base;
-extern crate afi;
 extern crate ami;
 
 pub use ami::Mat4;
@@ -16,6 +15,7 @@ pub use ami::Mat4;
 use adi_gpu_base as base;
 
 pub use base::{
+	afi, Graphic,
 	Model, TexCoords, Gradient, Shape,
 	Input, Key, Click, Msg, // Window
 	Display as DisplayTrait, Texture as TextureTrait, // Traits
@@ -30,10 +30,10 @@ pub enum Display {
 impl DisplayTrait for Display {
 	type Texture = Texture;
 
-	fn new(title: &str, icon: &afi::Graphic) -> Option<Self> {
-		if let Some(vulkan) = adi_gpu_vulkan::Display::new(title, icon) {
+	fn new<G: AsRef<Graphic>>(title: &str, icon: G) -> Option<Self> {
+		if let Some(vulkan) = adi_gpu_vulkan::Display::new(title, &icon) {
 			Some(Display::Vulkan(vulkan))
-		} else if let Some(opengl) = adi_gpu_opengl::Display::new(title, icon) {
+		} else if let Some(opengl) = adi_gpu_opengl::Display::new(title, &icon) {
 			Some(Display::OpenGL(opengl))
 		} else {
 			None
@@ -95,7 +95,7 @@ impl DisplayTrait for Display {
 		}
 	}
 
-	fn texture(&mut self, graphic: afi::Graphic) -> Texture {
+	fn texture<G: AsRef<Graphic>>(&mut self, graphic: G) -> Texture {
 		match *self {
 			Display::Vulkan(ref mut display) => {
 				Texture::Vulkan(display.texture(graphic))
