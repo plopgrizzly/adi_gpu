@@ -38,9 +38,9 @@ exclude = [
 
 [dependencies]
 ami = "^0.6"
-adi_gpu_vulkan = "^0.3"
-adi_gpu_opengl = "^0.2"
-adi_gpu_base = "^0.4"
+adi_gpu_vulkan = { path = "../adi_gpu_vulkan" } # "^0.3"
+adi_gpu_opengl = { path = "../adi_gpu_opengl" } # "^0.2"
+adi_gpu_base = { path = "../adi_gpu_base" } # "^0.4"
 
 # [dependencies.asi_vulkan]
 # version = "^0.2"

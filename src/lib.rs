@@ -73,13 +73,13 @@ impl DisplayTrait for Display {
 		}
 	}
 
-	fn model(&mut self, vertices: &[f32], indices: &[u32]) -> Model {
+	fn model(&mut self, vertices: &[f32]) -> Model {
 		match *self {
 			Display::Vulkan(ref mut display) => {
-				display.model(vertices, indices)
+				display.model(vertices)
 			}
 			Display::OpenGL(ref mut display) => {
-				display.model(vertices, indices)
+				display.model(vertices)
 			}
 		}
 	}
