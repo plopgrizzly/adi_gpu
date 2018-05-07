@@ -37,10 +37,10 @@ exclude = [
 ]
 
 [dependencies]
-ami = "^0.6"
-adi_gpu_vulkan = { path = "../adi_gpu_vulkan" } # "^0.3"
-adi_gpu_opengl = { path = "../adi_gpu_opengl" } # "^0.2"
-adi_gpu_base = { path = "../adi_gpu_base" } # "^0.4"
+ami = { git = "https://github.com/PlopGrizzly/ami" } # "^0.6"
+adi_gpu_vulkan = { git = "https://github.com/PlopGrizzly/adi_gpu_vulkan" } # "^0.3"
+adi_gpu_opengl = { git = "https://github.com/PlopGrizzly/adi_gpu_opengl" } # "^0.2"
+adi_gpu_base = { git = "https://github.com/PlopGrizzly/adi_gpu_base" } # "^0.4"
 
 # [dependencies.asi_vulkan]
 # version = "^0.2"
