@@ -21,6 +21,29 @@ pub use base::{
 	Display as DisplayTrait, Texture as TextureTrait, // Traits
 };
 
+/// Create a new Vulkan / OpenGL Display.
+pub fn new_display<G: AsRef<Graphic>>(title: &str, icon: G)
+	-> Result<Display, String>
+{
+	let mut err = "".to_string();
+
+	// Try Vulkan first.
+	match adi_gpu_vulkan::Display::new(title, &icon) {
+		Ok(vulkan) => return Ok(Display::Vulkan(vulkan)),
+		Err(vulkan) => err.push_str(vulkan),
+	}
+
+	// Fallback on OpenGL/OpenGLES
+	err.push('\n');
+	match adi_gpu_opengl::Display::new(title, &icon) {
+		Ok(opengl) => return Ok(Display::OpenGL(opengl)),
+		Err(opengl) => err.push_str(opengl),
+	}
+
+	// No more options
+	Err(err)
+}
+
 /// To render anything with adi_gpu, you have to make a `Display`
 pub enum Display {
 	Vulkan(adi_gpu_vulkan::Display),
@@ -30,14 +53,10 @@ pub enum Display {
 impl DisplayTrait for Display {
 	type Texture = Texture;
 
-	fn new<G: AsRef<Graphic>>(title: &str, icon: G) -> Option<Self> {
-		if let Some(vulkan) = adi_gpu_vulkan::Display::new(title, &icon) {
-			Some(Display::Vulkan(vulkan))
-		} else if let Some(opengl) = adi_gpu_opengl::Display::new(title, &icon) {
-			Some(Display::OpenGL(opengl))
-		} else {
-			None
-		}
+	fn new<G: AsRef<Graphic>>(_title: &str, _icon: G)
+		-> Result<Self, &'static str>
+	{
+		Err("Use new_display(), not Display::new()")
 	}
 
 	fn color(&mut self, color: (f32, f32, f32)) {
@@ -187,7 +206,7 @@ impl DisplayTrait for Display {
 
 	#[inline(always)]
 	fn shape_texture(&mut self, model: &Model, transform: Mat4,
-		texture: Texture, tc: TexCoords, blending: bool, fog: bool,
+		texture: &Texture, tc: TexCoords, blending: bool, fog: bool,
 		camera: bool) -> Shape
 	{
 		match *self {
@@ -220,7 +239,7 @@ impl DisplayTrait for Display {
 
 	#[inline(always)]
 	fn shape_faded(&mut self, model: &Model, transform: Mat4,
-		texture: Texture, tc: TexCoords, alpha: f32, fog: bool,
+		texture: &Texture, tc: TexCoords, alpha: f32, fog: bool,
 		camera: bool) -> Shape
 	{
 		match *self {
@@ -253,7 +272,7 @@ impl DisplayTrait for Display {
 
 	#[inline(always)]
 	fn shape_tinted(&mut self, model: &Model, transform: Mat4,
-		texture: Texture, tc: TexCoords, tint: [f32; 4], blending: bool,
+		texture: &Texture, tc: TexCoords, tint: [f32; 4], blending: bool,
 		fog: bool, camera: bool) -> Shape
 	{
 		match *self {
@@ -286,7 +305,7 @@ impl DisplayTrait for Display {
 
 	#[inline(always)]
 	fn shape_complex(&mut self, model: &Model, transform: Mat4,
-		texture: Texture, tc: TexCoords, tints: Gradient,
+		texture: &Texture, tc: TexCoords, tints: Gradient,
 		blending: bool, fog: bool, camera: bool) -> Shape
 	{
 		match *self {
@@ -351,7 +370,6 @@ impl DisplayTrait for Display {
 	}
 }
 
-#[derive(Copy, Clone)]
 pub enum Texture {
 	Vulkan(adi_gpu_vulkan::Texture),
 	OpenGL(adi_gpu_opengl::Texture)
