@@ -1,6 +1,5 @@
-# Cargo.toml -- Aldaron's Device Interface / GPU
-# Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
-# Licensed under the MIT LICENSE
+# "adi_gpu" crate - Licensed under the MIT LICENSE
+#  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 #                             _        _
 #                            /@\——————/@\
 # .———  .                   |   o    o   |     .————      .            .
@@ -14,10 +13,9 @@
 
 [package]
 name = "adi_gpu"
-version = "0.5.0"
+version = "0.6.0"
 authors = [
 	"Jeron A. Lau <jeron.lau@plopgrizzly.com>",
-	"Douglas P. Lau <doug.p.lau@gmail.com>"
 ]
 
 license = "MIT"
@@ -37,25 +35,11 @@ exclude = [
 ]
 
 [dependencies]
-ami = { path = "../ami" }
-adi_gpu_vulkan = { path = "../adi_gpu_vulkan" }
-adi_gpu_opengl = { path = "../adi_gpu_opengl" }
-adi_gpu_base = { path = "../adi_gpu_base" }
+ami = "^0.7"
+adi_gpu_base = "^0.5"
 
-# [dependencies.asi_vulkan]
-# version = "^0.2"
-# default-features = true
-# optional = true
+[target.'cfg(any(unix, target_os="windows", target_os="web"))'.dependencies]
+adi_gpu_opengl = "^0.3"
 
-# [dependencies.asi_opengl]
-# path = "../asi_opengl"
-## version = "^0.2"
-# default-features = true
-# optional = true
-
-#[features]
-#default = ["vulkan", "opengl"]
-#checks = ["asi_vulkan/checks"]
-#validation = ["asi_vulkan/validation"]
-#vulkan = ["asi_vulkan"]
-#opengl = ["asi_opengl"]
+[target.'cfg(any(unix, target_os="windows", target_os="nintendo_switch"))'.dependencies]
+adi_gpu_vulkan = "^0.4"

@@ -1,4 +1,4 @@
-# Aldaron's Device Interface - GPU (adi_gpu 0.5)
+# Aldaron's Device Interface / GPU
 
 [Aldaron's Device Interface / GPU (adi_gpu)](http://plopgrizzly.com/adi_gpu)
 is a library developed by [Plop Grizzly](http://plopgrizzly.com) for
