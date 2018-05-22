@@ -35,11 +35,11 @@ exclude = [
 ]
 
 [dependencies]
-ami = "^0.7"
-adi_gpu_base = "^0.5"
+ami = { path = "../ami" } # "^0.7"
+adi_gpu_base = { path = "../adi_gpu_base" } # "^0.5"
 
 [target.'cfg(any(unix, target_os="windows", target_os="web"))'.dependencies]
-adi_gpu_opengl = "^0.3"
+adi_gpu_opengl = { path = "../adi_gpu_opengl" } # "^0.3"
 
 [target.'cfg(any(unix, target_os="windows", target_os="nintendo_switch"))'.dependencies]
-adi_gpu_vulkan = "^0.4"
+adi_gpu_vulkan = { path = "../adi_gpu_vulkan" } # "^0.4"
