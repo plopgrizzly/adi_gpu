@@ -35,7 +35,7 @@ exclude = [
 ]
 
 [dependencies]
-ami = { path = "../ami" } # "^0.7"
+ami = "^0.8"
 adi_gpu_base = { path = "../adi_gpu_base" } # "^0.5"
 
 [target.'cfg(any(unix, target_os="windows", target_os="web"))'.dependencies]
