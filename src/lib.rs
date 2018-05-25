@@ -12,8 +12,8 @@ pub use ami::Mat4;
 use adi_gpu_base as base;
 
 pub use base::{
-	afi, Graphic, Model, TexCoords, Gradient, Shape, Input, Key, Click, Msg,
-	Display, Texture
+	afi, Graphic, Model, TexCoords, Gradient, Shape, Input, Display,
+	Texture
 };
 
 /// Create a new Vulkan / OpenGL Display.
