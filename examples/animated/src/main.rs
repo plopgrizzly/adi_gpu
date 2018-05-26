@@ -1,8 +1,5 @@
-// Aldaron's Device Interface / GPU
-// Copyright (c) 2017-2018 Jeron Lau <jeron.lau@plopgrizzly.com>
-// Licensed under the MIT LICENSE
-//
-// examples/animated/main.rs
+// "adi_gpu" crate - Licensed under the MIT LICENSE
+//  * Copyright (c) 2017-2018  Jeron A. Lau <jeron.lau@plopgrizzly.com>
 
 extern crate adi_gpu;
 extern crate aci_png;

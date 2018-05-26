@@ -5,7 +5,8 @@ is a library developed by [Plop Grizzly](http://plopgrizzly.com) for
 interfacing with the GPU to render graphics or do fast calculations.
 
 [Cargo](https://crates.io/crates/adi_gpu) /
-[Documentation](https://docs.rs/adi_gpu)
+[Documentation](https://docs.rs/adi_gpu) /
+[Change Log](http://plopgrizzly.com/adi_gpu/changelog.html)
 
 ## Features
 **adi_gpu**'s current features:

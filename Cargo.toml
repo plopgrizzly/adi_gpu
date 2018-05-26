@@ -13,7 +13,7 @@
 
 [package]
 name = "adi_gpu"
-version = "0.6.0"
+version = "0.7.0"
 authors = [
 	"Jeron A. Lau <jeron.lau@plopgrizzly.com>",
 ]
@@ -30,16 +30,16 @@ categories = ["rendering::graphics-api", "hardware-support",
 	"rendering::engine", "rendering"]
 
 exclude = [
-	"examples/*", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", ".gitignore",
+	"examples/*", "code_of_conduct.md", "contributing.md", ".gitignore",
 	"_config.yml", "ISSUE_TEMPLATE.md", "icon.png", "icon.ico"
 ]
 
 [dependencies]
 ami = "^0.8"
-adi_gpu_base = { path = "../adi_gpu_base" } # "^0.5"
+adi_gpu_base = "^0.6"
 
 [target.'cfg(any(unix, target_os="windows", target_os="web"))'.dependencies]
-adi_gpu_opengl = { path = "../adi_gpu_opengl" } # "^0.3"
+adi_gpu_opengl = "^0.4"
 
 [target.'cfg(any(unix, target_os="windows", target_os="nintendo_switch"))'.dependencies]
-adi_gpu_vulkan = { path = "../adi_gpu_vulkan" } # "^0.4"
+adi_gpu_vulkan = "^0.5"
